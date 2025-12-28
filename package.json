@@ -1,0 +1,23 @@
+{
+  "name": "focura-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Focura - Your personal planning assistant",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:mobile": "cd packages/mobile && flutter run",
+    "build:backend": "npm run build --workspace=packages/backend",
+    "build:mobile": "cd packages/mobile && flutter build",
+    "db:migrate": "npm run db:migrate --workspace=packages/backend",
+    "db:generate": "npm run db:generate --workspace=packages/backend",
+    "db:studio": "npm run db:studio --workspace=packages/backend"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
+
