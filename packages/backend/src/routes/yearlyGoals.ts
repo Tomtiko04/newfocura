@@ -10,8 +10,9 @@ const prisma = new PrismaClient();
 
 const yearlyGoalSchema = z.object({
   title: z.string().min(1),
-  description: z.string().optional(),
   why: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
 });
 
 const batchSchema = z.object({
@@ -26,12 +27,17 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     const payload = yearlyGoalSchema.parse(req.body);
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), 0, 1);
+    const defaultEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
     const goal = await prisma.yearlyGoal.create({
       data: {
         userId: req.userId,
         title: payload.title,
-        description: payload.description,
         why: payload.why,
+        startDate: payload.startDate ? new Date(payload.startDate) : defaultStart,
+        endDate: payload.endDate ? new Date(payload.endDate) : defaultEnd,
         status: 'draft',
       },
     });
@@ -82,7 +88,17 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
     const updated = await prisma.yearlyGoal.updateMany({
       where: { id: req.params.id, userId: req.userId },
-      data: payload,
+      data: {
+        ...('title' in payload ? { title: payload.title } : {}),
+        ...('why' in payload ? { why: payload.why } : {}),
+        ...('startDate' in payload && payload.startDate ? { startDate: new Date(payload.startDate) } : {}),
+        ...('endDate' in payload && payload.endDate ? { endDate: new Date(payload.endDate) } : {}),
+        ...('status' in payload ? { status: payload.status } : {}),
+        ...('feasibilityScore' in payload ? { feasibilityScore: payload.feasibilityScore } : {}),
+        ...('feasibilityComment' in payload ? { feasibilityComment: payload.feasibilityComment } : {}),
+        ...('strategicPivot' in payload ? { strategicPivot: payload.strategicPivot } : {}),
+        ...('priorityOrder' in payload ? { priorityOrder: payload.priorityOrder } : {}),
+      },
     });
 
     if (updated.count === 0) {
@@ -132,12 +148,15 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
     const { goals } = batchSchema.parse(req.body);
 
     const results = [];
+    const now = new Date();
+    const defaultEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
     for (const goal of goals) {
       const feasibility = await geminiService.analyzeGoalFeasibility(
         {
           title: goal.title,
-          description: goal.description || '',
-          deadline: new Date(new Date().getFullYear(), 11, 31), // end of year placeholder
+          description: '', // description removed; keep empty for model prompt
+          deadline: goal.endDate ? new Date(goal.endDate) : defaultEnd,
         },
         {
           currentLoad: 0,
@@ -147,8 +166,9 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
 
       results.push({
         title: goal.title,
-        description: goal.description,
         why: goal.why,
+        startDate: goal.startDate,
+        endDate: goal.endDate,
         feasibilityScore: feasibility.score,
         feasibilityComment: feasibility.analysis,
         strategicPivot: feasibility.pivot || null,

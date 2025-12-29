@@ -56,8 +56,9 @@ model YearlyGoal {
   id                 String   @id @default(cuid())
   userId             String
   title              String
-  description        String?
   why                String?
+  startDate          DateTime?
+  endDate            DateTime?
   feasibilityScore   Float?
   feasibilityComment String?
   strategicPivot     String?

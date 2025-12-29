@@ -4,8 +4,9 @@ import '../services/api_service.dart';
 class YearlyGoal {
   final String id;
   final String title;
-  final String? description;
   final String? why;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final double? feasibilityScore;
   final String? feasibilityComment;
   final String? strategicPivot;
@@ -15,8 +16,9 @@ class YearlyGoal {
   YearlyGoal({
     required this.id,
     required this.title,
-    this.description,
     this.why,
+    this.startDate,
+    this.endDate,
     this.feasibilityScore,
     this.feasibilityComment,
     this.strategicPivot,
@@ -26,8 +28,9 @@ class YearlyGoal {
 
   YearlyGoal copyWith({
     String? title,
-    String? description,
     String? why,
+    DateTime? startDate,
+    DateTime? endDate,
     double? feasibilityScore,
     String? feasibilityComment,
     String? strategicPivot,
@@ -37,8 +40,9 @@ class YearlyGoal {
     return YearlyGoal(
       id: id,
       title: title ?? this.title,
-      description: description ?? this.description,
       why: why ?? this.why,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
       feasibilityScore: feasibilityScore ?? this.feasibilityScore,
       feasibilityComment: feasibilityComment ?? this.feasibilityComment,
       strategicPivot: strategicPivot ?? this.strategicPivot,
@@ -51,8 +55,9 @@ class YearlyGoal {
     return YearlyGoal(
       id: json['id'],
       title: json['title'],
-      description: json['description'],
       why: json['why'],
+      startDate: json['startDate'] != null ? DateTime.parse(json['startDate']) : null,
+      endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
       feasibilityScore: (json['feasibilityScore'] as num?)?.toDouble(),
       feasibilityComment: json['feasibilityComment'],
       strategicPivot: json['strategicPivot'],
@@ -64,16 +69,18 @@ class YearlyGoal {
 
 class GoalAnalysis {
   final String title;
-  final String? description;
   final String? why;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final double? feasibilityScore;
   final String? feasibilityComment;
   final String? strategicPivot;
 
   GoalAnalysis({
     required this.title,
-    this.description,
     this.why,
+    this.startDate,
+    this.endDate,
     this.feasibilityScore,
     this.feasibilityComment,
     this.strategicPivot,
@@ -129,14 +136,16 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
 
   Future<bool> addGoal({
     required String title,
-    String? description,
     String? why,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     try {
       final resp = await _api.post('/yearly-goals', data: {
         'title': title,
-        if (description != null && description.isNotEmpty) 'description': description,
         if (why != null && why.isNotEmpty) 'why': why,
+        if (startDate != null) 'startDate': startDate.toIso8601String(),
+        if (endDate != null) 'endDate': endDate.toIso8601String(),
       });
       if (resp.statusCode == 201) {
         await loadGoals();
@@ -150,9 +159,10 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
 
   Future<bool> updateGoal(String id, {
     String? title,
-    String? description,
     String? why,
     String? status,
+    DateTime? startDate,
+    DateTime? endDate,
     double? feasibilityScore,
     String? feasibilityComment,
     String? strategicPivot,
@@ -161,9 +171,10 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     try {
       final data = <String, dynamic>{};
       if (title != null) data['title'] = title;
-      if (description != null) data['description'] = description;
       if (why != null) data['why'] = why;
       if (status != null) data['status'] = status;
+      if (startDate != null) data['startDate'] = startDate.toIso8601String();
+      if (endDate != null) data['endDate'] = endDate.toIso8601String();
       if (feasibilityScore != null) data['feasibilityScore'] = feasibilityScore;
       if (feasibilityComment != null) data['feasibilityComment'] = feasibilityComment;
       if (strategicPivot != null) data['strategicPivot'] = strategicPivot;
@@ -198,16 +209,18 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
       final payload = {
         'goals': state.goals.map((g) => {
           'title': g.title,
-          'description': g.description,
           'why': g.why,
+          'startDate': g.startDate?.toIso8601String(),
+          'endDate': g.endDate?.toIso8601String(),
         }).toList(),
       };
       final resp = await _api.post('/yearly-goals/feasibility', data: payload);
       final results = (resp.data['results'] as List<dynamic>).map((r) {
         return GoalAnalysis(
           title: r['title'],
-          description: r['description'],
           why: r['why'],
+          startDate: r['startDate'] != null ? DateTime.parse(r['startDate']) : null,
+          endDate: r['endDate'] != null ? DateTime.parse(r['endDate']) : null,
           feasibilityScore: (r['feasibilityScore'] as num?)?.toDouble(),
           feasibilityComment: r['feasibilityComment'],
           strategicPivot: r['strategicPivot'],
@@ -242,7 +255,6 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     for (final item in items) {
       await addGoal(
         title: item['title'] ?? 'Untitled Goal',
-        description: item['description'],
         why: item['why'],
       );
     }

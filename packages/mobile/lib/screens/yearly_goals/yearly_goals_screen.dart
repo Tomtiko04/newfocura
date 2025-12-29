@@ -15,14 +15,14 @@ class YearlyGoalsScreen extends ConsumerStatefulWidget {
 
 class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _whyController = TextEditingController();
+  DateTime? _startDate;
+  DateTime? _endDate;
   bool _isImporting = false;
 
   @override
   void dispose() {
     _titleController.dispose();
-    _descriptionController.dispose();
     _whyController.dispose();
     super.dispose();
   }
@@ -65,21 +65,60 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          hintText: 'What is the goal about?',
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
                         controller: _whyController,
                         decoration: const InputDecoration(
                           labelText: 'Why it matters',
                           hintText: 'Why is this important to you?',
                         ),
                         maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _startDate ?? DateTime.now(),
+                                  firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (picked != null) {
+                                  setState(() => _startDate = picked);
+                                }
+                              },
+                              icon: const Icon(Icons.calendar_today),
+                              label: Text(
+                                _startDate == null
+                                    ? 'Start (default Jan 1)'
+                                    : 'Start: ${_startDate!.toLocal().toString().split(' ')[0]}',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _endDate ?? DateTime.now().add(const Duration(days: 180)),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 366)),
+                                );
+                                if (picked != null) {
+                                  setState(() => _endDate = picked);
+                                }
+                              },
+                              icon: const Icon(Icons.event),
+                              label: Text(
+                                _endDate == null
+                                    ? 'End (default Dec 31)'
+                                    : 'End: ${_endDate!.toLocal().toString().split(' ')[0]}',
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -94,15 +133,15 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                               }
                               final ok = await notifier.addGoal(
                                 title: _titleController.text.trim(),
-                                description: _descriptionController.text.trim().isEmpty
-                                    ? null
-                                    : _descriptionController.text.trim(),
                                 why: _whyController.text.trim().isEmpty ? null : _whyController.text.trim(),
+                                startDate: _startDate,
+                                endDate: _endDate,
                               );
                               if (ok && mounted) {
                                 _titleController.clear();
-                                _descriptionController.clear();
                                 _whyController.clear();
+                                _startDate = null;
+                                _endDate = null;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Goal added')),
                                 );
@@ -199,10 +238,13 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (goal.description != null && goal.description!.isNotEmpty)
-                              Text(goal.description!),
                             if (goal.why != null && goal.why!.isNotEmpty)
                               Text('Why: ${goal.why!}'),
+                            Text(
+                              'Start: ${goal.startDate?.toLocal().toString().split(' ')[0] ?? 'Jan 1'}'
+                              '  •  End: ${goal.endDate?.toLocal().toString().split(' ')[0] ?? 'Dec 31'}',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
                             if (analysis.feasibilityScore != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -262,8 +304,9 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
 
   void _showEditDialog(YearlyGoal goal) {
     final titleController = TextEditingController(text: goal.title);
-    final descController = TextEditingController(text: goal.description);
     final whyController = TextEditingController(text: goal.why);
+    DateTime? startDate = goal.startDate;
+    DateTime? endDate = goal.endDate;
     final notifier = ref.read(yearlyGoalsProvider.notifier);
 
     showDialog(
@@ -279,14 +322,57 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                 decoration: const InputDecoration(labelText: 'Title'),
               ),
               TextField(
-                controller: descController,
-                decoration: const InputDecoration(labelText: 'Description'),
-                maxLines: 2,
-              ),
-              TextField(
                 controller: whyController,
                 decoration: const InputDecoration(labelText: 'Why it matters'),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: startDate ?? DateTime.now(),
+                          firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setState(() => startDate = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.calendar_today),
+                      label: Text(
+                        startDate == null
+                            ? 'Start (default Jan 1)'
+                            : 'Start: ${startDate!.toLocal().toString().split(' ')[0]}',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: endDate ?? DateTime.now().add(const Duration(days: 180)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 366)),
+                        );
+                        if (picked != null) {
+                          setState(() => endDate = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.event),
+                      label: Text(
+                        endDate == null
+                            ? 'End (default Dec 31)'
+                            : 'End: ${endDate!.toLocal().toString().split(' ')[0]}',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -301,8 +387,9 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
               await notifier.updateGoal(
                 goal.id,
                 title: titleController.text,
-                description: descController.text,
                 why: whyController.text,
+                startDate: startDate,
+                endDate: endDate,
               );
               if (mounted) Navigator.of(context).pop();
             },
@@ -389,8 +476,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
       final goals = (response.data['goals'] as List<dynamic>? ?? [])
           .map((g) => {
                 'title': g['title'] as String?,
-                'description': g['notes'] as String?,
-                'why': null,
+                'why': g['notes'] as String?, // map notes to why reflection
               })
           .toList();
 
