@@ -11,6 +11,7 @@ import 'screens/tasks/tasks_screen.dart';
 import 'screens/schedule/schedule_screen.dart';
 import 'screens/morning_sync/morning_sync_screen.dart';
 import 'screens/momentum/momentum_screen.dart';
+import 'screens/yearly_goals/yearly_goals_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -26,6 +27,8 @@ class FocuraApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch auth state to trigger router rebuild when it changes
+    ref.watch(authStateProvider);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
@@ -39,10 +42,22 @@ class FocuraApp extends ConsumerWidget {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  
+  // Listen to auth state changes and refresh router
+  ref.listen<AuthState>(authStateProvider, (previous, next) {
+    if (previous?.isAuthenticated != next.isAuthenticated) {
+      // Auth state changed, router will rebuild automatically via watch
+    }
+  });
 
   return GoRouter(
     initialLocation: '/login',
     redirect: (context, state) {
+      // Don't redirect if we're still loading
+      if (authState.isLoading) {
+        return null;
+      }
+      
       final isLoggedIn = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register';
 
@@ -90,6 +105,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/momentum',
         builder: (context, state) => const MomentumScreen(),
+      ),
+      GoRoute(
+        path: '/yearly-goals',
+        builder: (context, state) => const YearlyGoalsScreen(),
       ),
     ],
   );

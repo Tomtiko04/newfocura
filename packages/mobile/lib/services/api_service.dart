@@ -1,14 +1,28 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   late final Dio _dio;
-  static const String baseUrl = 'http://localhost:3000/api/v1';
+  
+  // Use 10.0.2.2 for Android emulator to access host machine's localhost
+  // Use localhost for iOS simulator and web
+  static String get baseUrl {
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:3000/api/v1';
+    } else {
+      return 'http://localhost:3000/api/v1';
+    }
+  }
 
   ApiService() {
+    final url = ApiService.baseUrl;
+    print('ApiService initialized with baseUrl: $url');
+    print('Platform.isAndroid: ${Platform.isAndroid}');
+    
     _dio = Dio(
       BaseOptions(
-        baseUrl: baseUrl,
+        baseUrl: url,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {

@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: true, // Allow all origins in development
   credentials: true,
 }));
 app.use(express.json());
@@ -32,6 +32,7 @@ import pfcShieldRoutes from './routes/pfcShield';
 import momentumRoutes from './routes/momentum';
 import scheduleRoutes from './routes/schedule';
 import weeklyStrategyRoutes from './routes/weeklyStrategy';
+import yearlyGoalsRoutes from './routes/yearlyGoals';
 
 // API v1 routes
 app.use('/api/v1/auth', authRoutes);
@@ -43,6 +44,7 @@ app.use('/api/v1/pfc-shield', pfcShieldRoutes);
 app.use('/api/v1/momentum', momentumRoutes);
 app.use('/api/v1/schedule', scheduleRoutes);
 app.use('/api/v1/weekly-strategy', weeklyStrategyRoutes);
+app.use('/api/v1/yearly-goals', yearlyGoalsRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

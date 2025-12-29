@@ -30,10 +30,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
 
       if (success && mounted) {
-        context.go('/home');
+        // Check auth state after login
+        final currentAuth = ref.read(authStateProvider);
+        print(
+            'After login - isAuthenticated: ${currentAuth.isAuthenticated}, userId: ${currentAuth.userId}');
+        if (currentAuth.isAuthenticated) {
+          // Router redirect should handle this, but navigate as backup
+          context.go('/home');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Login succeeded but authentication state not updated.')),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login failed. Please check your credentials.')),
+          const SnackBar(
+              content: Text('Login failed. Please check your credentials.')),
         );
       }
     }
@@ -61,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your personal planning assistant',
+                    'Your personal planning assistant!!',
                     style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
@@ -118,7 +132,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: () {
                       // TODO: Implement Apple Sign-In
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Apple Sign-In coming soon')),
+                        const SnackBar(
+                            content: Text('Apple Sign-In coming soon')),
                       );
                     },
                     icon: const Icon(Icons.apple),
@@ -141,4 +156,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
-

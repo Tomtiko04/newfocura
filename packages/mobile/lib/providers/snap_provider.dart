@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,8 +30,13 @@ class SnapService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       
+      // Use 10.0.2.2 for Android emulator to access host machine's localhost
+      final baseUrl = Platform.isAndroid 
+          ? 'http://10.0.2.2:3000/api/v1'
+          : 'http://localhost:3000/api/v1';
+      
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://localhost:3000/api/v1',
+        baseUrl: baseUrl,
         headers: {
           'Authorization': 'Bearer $token',
         },

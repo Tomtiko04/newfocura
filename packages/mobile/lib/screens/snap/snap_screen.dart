@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/snap_provider.dart';
 
@@ -33,6 +34,10 @@ class _SnapScreenState extends ConsumerState<SnapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Snap'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/home'),
+        ),
       ),
       body: Column(
         children: [

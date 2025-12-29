@@ -80,6 +80,32 @@ export class SnapService {
     }
   }
 
+  /**
+   * Process multiple images to extract yearly goals (no DB writes)
+   */
+  async processGoalsFromImages(
+    userId: string,
+    files: { buffer: Buffer; mimetype: string }[],
+  ): Promise<{ goals: Array<{ title: string; notes?: string }> }> {
+    const aggregated: Array<{ title: string; notes?: string }> = [];
+
+    for (const file of files) {
+      const imageBase64 = file.buffer.toString('base64');
+      const extractionResult = await geminiService.processSnapImage(imageBase64, file.mimetype);
+
+      for (const item of extractionResult.extracted_items) {
+        if (item.type === 'goal') {
+          aggregated.push({
+            title: item.original_text,
+            notes: item.feasibility_warning || undefined,
+          });
+        }
+      }
+    }
+
+    return { goals: aggregated };
+  }
+
   private extractTextFromSnapResponse(response: SnapResponse): string {
     const texts: string[] = [];
     

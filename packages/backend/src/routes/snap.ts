@@ -58,6 +58,41 @@ router.post(
   }
 );
 
+// Upload multiple images to extract goals (no DB writes)
+router.post(
+  '/goals',
+  authenticateToken,
+  upload.array('images', 5),
+  async (req: AuthRequest, res) => {
+    try {
+      if (!req.files || !(req.files instanceof Array) || req.files.length === 0) {
+        return res.status(400).json({ error: 'No image files provided' });
+      }
+
+      if (!req.userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const files = req.files as Express.Multer.File[];
+      const result = await snapService.processGoalsFromImages(
+        req.userId,
+        files.map(f => ({ buffer: f.buffer, mimetype: f.mimetype }))
+      );
+
+      res.json({
+        success: true,
+        goals: result.goals,
+      });
+    } catch (error) {
+      logger.error('Snap goals upload error:', error);
+      res.status(500).json({
+        error: 'Failed to process goal snaps',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+);
+
 // Get snap status
 router.get('/:snapId/status', authenticateToken, async (req: AuthRequest, res) => {
   try {

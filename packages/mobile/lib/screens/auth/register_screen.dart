@@ -29,14 +29,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final success = await ref.read(authStateProvider.notifier).register(
             _emailController.text.trim(),
             _passwordController.text,
-            _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+            _nameController.text.trim().isEmpty
+                ? null
+                : _nameController.text.trim(),
           );
 
       if (success && mounted) {
-        context.go('/home');
+        // Check auth state after registration
+        final currentAuth = ref.read(authStateProvider);
+        if (currentAuth.isAuthenticated) {
+          // Router redirect should handle this, but navigate as backup
+          context.go('/home');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Registration succeeded but authentication state not updated.')),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration failed. Please try again.')),
+          const SnackBar(
+              content: Text('Registration failed. Please try again.')),
         );
       }
     }
@@ -132,7 +146,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     onPressed: () {
                       // TODO: Implement Apple Sign-In
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Apple Sign-In coming soon')),
+                        const SnackBar(
+                            content: Text('Apple Sign-In coming soon')),
                       );
                     },
                     icon: const Icon(Icons.apple),
@@ -155,4 +170,3 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 }
-

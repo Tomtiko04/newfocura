@@ -43,6 +43,12 @@ class HomeScreen extends ConsumerWidget {
             onTap: () => context.go('/goals'),
           ),
           _FeatureCard(
+            title: 'Yearly Goals',
+            icon: Icons.emoji_events,
+            color: Colors.teal,
+            onTap: () => context.go('/yearly-goals'),
+          ),
+          _FeatureCard(
             title: 'Tasks',
             icon: Icons.checklist,
             color: Colors.orange,
