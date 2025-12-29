@@ -127,6 +127,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : const Text('Login'),
                   ),
                   const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      // TODO: Implement Google Sign-In
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Google Sign-In coming soon')),
+                      );
+                    },
+                    icon: const Icon(Icons.login),
+                    label: const Text('Continue with Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   // Apple Sign-In button (prominent)
                   OutlinedButton.icon(
                     onPressed: () {
