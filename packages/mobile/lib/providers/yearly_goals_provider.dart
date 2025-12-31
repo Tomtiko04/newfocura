@@ -12,6 +12,10 @@ class YearlyGoal {
   final String? feasibilityComment;
   final String? strategicPivot;
   final double? estimatedHours;
+  final double? impactScore;
+  final String? priorityBucket;
+  final int? suggestedQuarter;
+  final String? skillLevel;
   final int? priorityOrder;
   final String status; // draft, analyzed, finalized
 
@@ -25,6 +29,10 @@ class YearlyGoal {
     this.feasibilityComment,
     this.strategicPivot,
     this.estimatedHours,
+    this.impactScore,
+    this.priorityBucket,
+    this.suggestedQuarter,
+    this.skillLevel,
     this.priorityOrder,
     required this.status,
   });
@@ -38,6 +46,10 @@ class YearlyGoal {
     String? feasibilityComment,
     String? strategicPivot,
     double? estimatedHours,
+    double? impactScore,
+    String? priorityBucket,
+    int? suggestedQuarter,
+    String? skillLevel,
     int? priorityOrder,
     String? status,
   }) {
@@ -51,6 +63,10 @@ class YearlyGoal {
       feasibilityComment: feasibilityComment ?? this.feasibilityComment,
       strategicPivot: strategicPivot ?? this.strategicPivot,
       estimatedHours: estimatedHours ?? this.estimatedHours,
+      impactScore: impactScore ?? this.impactScore,
+      priorityBucket: priorityBucket ?? this.priorityBucket,
+      suggestedQuarter: suggestedQuarter ?? this.suggestedQuarter,
+      skillLevel: skillLevel ?? this.skillLevel,
       priorityOrder: priorityOrder ?? this.priorityOrder,
       status: status ?? this.status,
     );
@@ -67,6 +83,10 @@ class YearlyGoal {
       feasibilityComment: json['feasibilityComment'],
       strategicPivot: json['strategicPivot'],
       estimatedHours: (json['estimatedHours'] as num?)?.toDouble(),
+      impactScore: (json['impactScore'] as num?)?.toDouble(),
+      priorityBucket: json['priorityBucket'],
+      suggestedQuarter: json['suggestedQuarter'],
+      skillLevel: json['skillLevel'],
       priorityOrder: json['priorityOrder'],
       status: json['status'] ?? 'draft',
     );
@@ -82,6 +102,9 @@ class GoalAnalysis {
   final String? feasibilityComment;
   final String? strategicPivot;
   final double? estimatedHours;
+  final double? impactScore;
+  final String? priorityBucket;
+  final int? suggestedQuarter;
 
   GoalAnalysis({
     required this.title,
@@ -92,6 +115,9 @@ class GoalAnalysis {
     this.feasibilityComment,
     this.strategicPivot,
     this.estimatedHours,
+    this.impactScore,
+    this.priorityBucket,
+    this.suggestedQuarter,
   });
 }
 
@@ -147,16 +173,18 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     String? why,
     DateTime? startDate,
     DateTime? endDate,
+    String? skillLevel,
   }) async {
     try {
       // Debug logging
       // ignore: avoid_print
-      print('Adding yearly goal: title=$title, why=$why, start=$startDate, end=$endDate');
+      print('Adding yearly goal: title=$title, why=$why, start=$startDate, end=$endDate, skill=$skillLevel');
       final resp = await _api.post('/yearly-goals', data: {
         'title': title,
         if (why != null && why.isNotEmpty) 'why': why,
         if (startDate != null) 'startDate': startDate.toIso8601String(),
         if (endDate != null) 'endDate': endDate.toIso8601String(),
+        if (skillLevel != null) 'skillLevel': skillLevel,
       });
       if (resp.statusCode == 201) {
         await loadGoals();
@@ -184,6 +212,10 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     String? feasibilityComment,
     String? strategicPivot,
     double? estimatedHours,
+    double? impactScore,
+    String? priorityBucket,
+    int? suggestedQuarter,
+    String? skillLevel,
     int? priorityOrder,
   }) async {
     try {
@@ -197,6 +229,10 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
       if (feasibilityComment != null) data['feasibilityComment'] = feasibilityComment;
       if (strategicPivot != null) data['strategicPivot'] = strategicPivot;
       if (estimatedHours != null) data['estimatedHours'] = estimatedHours;
+      if (impactScore != null) data['impactScore'] = impactScore;
+      if (priorityBucket != null) data['priorityBucket'] = priorityBucket;
+      if (suggestedQuarter != null) data['suggestedQuarter'] = suggestedQuarter;
+      if (skillLevel != null) data['skillLevel'] = skillLevel;
       if (priorityOrder != null) data['priorityOrder'] = priorityOrder;
 
       final resp = await _api.put('/yearly-goals/$id', data: data);
@@ -251,6 +287,9 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
           feasibilityComment: r['feasibilityComment'],
           strategicPivot: r['strategicPivot'],
           estimatedHours: (r['estimatedHours'] as num?)?.toDouble(),
+          impactScore: (r['impactScore'] as num?)?.toDouble(),
+          priorityBucket: r['priorityBucket'],
+          suggestedQuarter: r['suggestedQuarter'],
         );
       }).toList();
       state = state.copyWith(analysisResults: results);
@@ -275,6 +314,9 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
         feasibilityComment: match.feasibilityComment,
         strategicPivot: match.strategicPivot,
         estimatedHours: match.estimatedHours,
+        impactScore: match.impactScore,
+        priorityBucket: match.priorityBucket,
+        suggestedQuarter: match.suggestedQuarter,
         status: 'finalized',
       );
     }

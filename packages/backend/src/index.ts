@@ -33,9 +33,11 @@ import momentumRoutes from './routes/momentum';
 import scheduleRoutes from './routes/schedule';
 import weeklyStrategyRoutes from './routes/weeklyStrategy';
 import yearlyGoalsRoutes from './routes/yearlyGoals';
+import userRoutes from './routes/user';
 
 // API v1 routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/snap', snapRoutes);
 app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/tasks', taskRoutes);

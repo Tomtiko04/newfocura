@@ -96,8 +96,15 @@ export class GeminiService {
    * Analyze goal portfolio holistically with HIGH thinking level for deep reasoning
    */
   async analyzeGoalPortfolio(
-    goals: Array<{ title: string; why?: string; deadline: Date }>,
-    userContext: { currentLoad: number; weeklyHours: number }
+    goals: Array<{ title: string; why?: string; deadline: Date; skillLevel?: string }>,
+    userContext: { 
+      currentLoad: number; 
+      weekdayFocusHours: number;
+      weekendFocusHours: number;
+      lifeSeason: string;
+      reliabilityScore: number;
+      antiGoals: string[];
+    }
   ): Promise<{
     summary: string;
     results: Array<{ 
@@ -105,7 +112,10 @@ export class GeminiService {
       score: number; 
       analysis: string; 
       pivot?: string; 
-      estimatedHours?: number 
+      estimatedHours?: number;
+      impactScore: number;
+      priorityBucket: string;
+      suggestedQuarter: number;
     }>
   }> {
     const prompt = this.getPortfolioPrompt(goals, userContext);
@@ -151,6 +161,9 @@ export class GeminiService {
           analysis: analysisText,
           pivot: r.strategicPivot,
           estimatedHours: r.estimatedHoursRequired,
+          impactScore: r.impactScore ?? 5,
+          priorityBucket: r.priorityBucket ?? 'C',
+          suggestedQuarter: r.suggestedQuarter ?? 1,
         };
       });
 
@@ -165,30 +178,47 @@ export class GeminiService {
   }
 
   private getPortfolioPrompt(
-    goals: Array<{ title: string; why?: string; deadline: Date }>,
-    userContext: { currentLoad: number; weeklyHours: number }
+    goals: Array<{ title: string; why?: string; deadline: Date; skillLevel?: string }>,
+    userContext: { 
+      currentLoad: number; 
+      weekdayFocusHours: number;
+      weekendFocusHours: number;
+      lifeSeason: string;
+      reliabilityScore: number;
+      antiGoals: string[];
+    }
   ): string {
     const goalsXml = goals.map((g, i) => `
 <goal id="${i + 1}">
   <title>${g.title}</title>
   <reasoning>${g.why ?? 'Not provided'}</reasoning>
   <deadline>${g.deadline.toISOString()}</deadline>
+  <skillLevel>${g.skillLevel ?? 'beginner'}</skillLevel>
 </goal>`).join('');
+
+    const weeklyCapacity = (userContext.weekdayFocusHours * 5) + userContext.weekendFocusHours;
 
     return `System: You are an expert productivity coach and project portfolio analyst. Your task is to perform a "Holistic Portfolio Pass" on a user's yearly goals.
 
-User Context:
-- Current task load: ${userContext.currentLoad} active tasks
-- Available hours: ${userContext.weeklyHours} hours/week
+User "Current Reality" Context:
+- Available Deep Work: ${userContext.weekdayFocusHours} hrs/weekday, ${userContext.weekendFocusHours} hrs/weekend.
+- Total Weekly Capacity: ${weeklyCapacity} hours/week.
+- Life Season: ${userContext.lifeSeason} (push = aggressive, sustainability = balanced).
+- Reliability Score: ${userContext.reliabilityScore}/5 (1 = high volatility/disruptions, 5 = very stable).
+- Anti-Goals (Constraints): ${userContext.antiGoals.join(', ')}.
 
 Goal Portfolio:
 ${goalsXml}
 
 Task:
-1. RESOURCE ALLOCATION: Estimate the weekly hours required for EACH goal.
-2. CAPACITY CHECK: Compare the cumulative hours against the user's 100% capacity (${userContext.weeklyHours} hrs/week).
-3. CONFLICT DETECTION: Identify cognitive or resource conflicts between goals (e.g., two high-focus skills being learned simultaneously).
-4. REASONING: Explain how these goals interact. If the portfolio is over-capacity, suggest which goals to pivot or postpone.
+1. IMPACT WEIGHTING: Assign an "Impact Score" (1-10) to each goal based on the user's "Why" reasoning.
+2. RESOURCE ALLOCATION: Estimate total hours required. If skillLevel is "beginner", add a 30% "Newbie Tax" to the estimate.
+3. PORTFOLIO TRIAGE: Categorize goals into buckets:
+   - Bucket A (The Big 3): Max 3 goals. High impact, high priority. 60% of capacity.
+   - Bucket B (Supporters): Up to 5 goals. 30% of capacity.
+   - Bucket C (Backlog): Lower priority or queued.
+4. QUARTERLY SEQUENCING: Suggest which Quarter (1-4) to start each goal to prevent burnout and respect prerequisites.
+5. REALITY CHECK: If total hours exceed capacity (adjusted for reliabilityScore), lower feasibility scores and suggest pivots.
 
 Output Requirements:
 Return ONLY a valid JSON object with this structure:
@@ -198,9 +228,12 @@ Return ONLY a valid JSON object with this structure:
     {
       "title": "exact title from input",
       "feasibilityScore": number (0-100),
-      "estimatedHoursRequired": number (total for the year),
+      "estimatedHoursRequired": number,
+      "impactScore": number (1-10),
+      "priorityBucket": "A | B | C",
+      "suggestedQuarter": 1 | 2 | 3 | 4,
       "analysis": {
-         "summary": "How this specific goal fits into the portfolio",
+         "summary": "How this fits into the user's reality",
          "challenges": ["string"],
          "opportunities": ["string"]
       },
@@ -209,7 +242,7 @@ Return ONLY a valid JSON object with this structure:
   ]
 }
 
-IMPORTANT: Total capacity reasoning must inform the individual feasibility scores. If the portfolio is overloaded, scores must reflect that risk.`;
+IMPORTANT: Total capacity reasoning MUST inform the buckets and suggested quarters. Do not put more than 3 high-effort goals in Bucket A.`;
   }
 
   /**

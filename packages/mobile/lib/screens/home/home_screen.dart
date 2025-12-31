@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/user_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userReality = ref.watch(userProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,53 +26,98 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: GridView.count(
-        crossAxisCount: 2,
-        padding: const EdgeInsets.all(16),
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+      body: Column(
         children: [
-          _FeatureCard(
-            title: 'Snap',
-            icon: Icons.camera_alt,
-            color: Colors.blue,
-            onTap: () => context.go('/snap'),
+          userReality.when(
+            data: (reality) {
+              if (reality == null || !reality.onboardingCompleted) {
+                return Container(
+                  width: double.infinity,
+                  color: Colors.indigo.withOpacity(0.1),
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.psychology, color: Colors.indigo),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Reality Check Required',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+                            ),
+                            const Text(
+                              'Focura needs to understand your context to optimize your goals.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push('/reality-check'),
+                        child: const Text('Start'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => const SizedBox.shrink(),
           ),
-          _FeatureCard(
-            title: 'Goals',
-            icon: Icons.flag,
-            color: Colors.green,
-            onTap: () => context.go('/goals'),
-          ),
-          _FeatureCard(
-            title: 'Yearly Goals',
-            icon: Icons.emoji_events,
-            color: Colors.teal,
-            onTap: () => context.go('/yearly-goals'),
-          ),
-          _FeatureCard(
-            title: 'Tasks',
-            icon: Icons.checklist,
-            color: Colors.orange,
-            onTap: () => context.go('/tasks'),
-          ),
-          _FeatureCard(
-            title: 'Schedule',
-            icon: Icons.calendar_today,
-            color: Colors.purple,
-            onTap: () => context.go('/schedule'),
-          ),
-          _FeatureCard(
-            title: 'Morning Sync',
-            icon: Icons.wb_sunny,
-            color: Colors.amber,
-            onTap: () => context.go('/morning-sync'),
-          ),
-          _FeatureCard(
-            title: 'Momentum',
-            icon: Icons.trending_up,
-            color: Colors.red,
-            onTap: () => context.go('/momentum'),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              padding: const EdgeInsets.all(16),
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              children: [
+                _FeatureCard(
+                  title: 'Snap',
+                  icon: Icons.camera_alt,
+                  color: Colors.blue,
+                  onTap: () => context.go('/snap'),
+                ),
+                _FeatureCard(
+                  title: 'Goals',
+                  icon: Icons.flag,
+                  color: Colors.green,
+                  onTap: () => context.go('/goals'),
+                ),
+                _FeatureCard(
+                  title: 'Yearly Goals',
+                  icon: Icons.emoji_events,
+                  color: Colors.teal,
+                  onTap: () => context.go('/yearly-goals'),
+                ),
+                _FeatureCard(
+                  title: 'Tasks',
+                  icon: Icons.checklist,
+                  color: Colors.orange,
+                  onTap: () => context.go('/tasks'),
+                ),
+                _FeatureCard(
+                  title: 'Schedule',
+                  icon: Icons.calendar_today,
+                  color: Colors.purple,
+                  onTap: () => context.go('/schedule'),
+                ),
+                _FeatureCard(
+                  title: 'Morning Sync',
+                  icon: Icons.wb_sunny,
+                  color: Colors.amber,
+                  onTap: () => context.go('/morning-sync'),
+                ),
+                _FeatureCard(
+                  title: 'Momentum',
+                  icon: Icons.trending_up,
+                  color: Colors.red,
+                  onTap: () => context.go('/momentum'),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -13,6 +13,7 @@ import 'screens/morning_sync/morning_sync_screen.dart';
 import 'screens/momentum/momentum_screen.dart';
 import 'screens/yearly_goals/yearly_goals_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/onboarding/onboarding_survey_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -116,6 +117,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/reality-check',
+        builder: (context, state) => const OnboardingSurveyScreen(),
       ),
       GoRoute(
         path: '/splash',

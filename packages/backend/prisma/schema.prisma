@@ -18,6 +18,15 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
+  // Reality Check / Onboarding Profile
+  onboardingCompleted Boolean @default(false)
+  weekdayFocusHours   Float   @default(2.0)
+  weekendFocusHours   Float   @default(4.0)
+  energyChronotype    String  @default("morning") // morning, afternoon, night
+  lifeSeason          String  @default("sustainability") // push, sustainability
+  reliabilityScore    Int     @default(3) // 1-5
+  antiGoals           String[] // List of things to stop doing
+  
   // OAuth
   googleId      String?   @unique
   appleId       String?   @unique
@@ -63,6 +72,10 @@ model YearlyGoal {
   feasibilityComment String?
   strategicPivot     String?
   estimatedHours     Float?
+  impactScore        Float?    // 1-10
+  priorityBucket     String?   // A (The Big 3), B (Supporters), C (Backlog)
+  suggestedQuarter   Int?      // 1, 2, 3, 4
+  skillLevel         String?   @default("beginner") // beginner (zero foundation), intermediate, expert
   priorityOrder      Int?
   status             String   @default("draft") // draft, analyzed, finalized
   createdAt          DateTime @default(now())

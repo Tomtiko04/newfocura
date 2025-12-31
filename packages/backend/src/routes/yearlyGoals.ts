@@ -11,8 +11,9 @@ const prisma = new PrismaClient();
 const yearlyGoalSchema = z.object({
   title: z.string().min(1),
   why: z.string().optional(),
-  startDate: z.string().optional().nullable(), // relaxed: allow plain ISO without offset
-  endDate: z.string().optional().nullable(),   // relaxed
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  skillLevel: z.enum(['beginner', 'intermediate', 'expert']).optional(),
 });
 
 const batchSchema = z.object({
@@ -39,6 +40,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
         why: payload.why,
         startDate: payload.startDate ? new Date(payload.startDate) : defaultStart,
         endDate: payload.endDate ? new Date(payload.endDate) : defaultEnd,
+        skillLevel: payload.skillLevel || 'beginner',
         status: 'draft',
       },
     });
@@ -86,6 +88,10 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       feasibilityComment: z.string().optional(),
       strategicPivot: z.string().optional(),
       estimatedHours: z.number().optional(),
+      impactScore: z.number().optional(),
+      priorityBucket: z.enum(['A', 'B', 'C']).optional(),
+      suggestedQuarter: z.number().min(1).max(4).optional(),
+      skillLevel: z.enum(['beginner', 'intermediate', 'expert']).optional(),
       priorityOrder: z.number().int().optional(),
     }).parse(req.body);
 
@@ -105,6 +111,10 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         ...('feasibilityComment' in payload ? { feasibilityComment: payload.feasibilityComment } : {}),
         ...('strategicPivot' in payload ? { strategicPivot: payload.strategicPivot } : {}),
         ...('estimatedHours' in payload ? { estimatedHours: payload.estimatedHours } : {}),
+        ...('impactScore' in payload ? { impactScore: payload.impactScore } : {}),
+        ...('priorityBucket' in payload ? { priorityBucket: payload.priorityBucket } : {}),
+        ...('suggestedQuarter' in payload ? { suggestedQuarter: payload.suggestedQuarter } : {}),
+        ...('skillLevel' in payload ? { skillLevel: payload.skillLevel } : {}),
         ...('priorityOrder' in payload ? { priorityOrder: payload.priorityOrder } : {}),
       },
     });
@@ -157,6 +167,21 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
 
     const { goals } = batchSchema.parse(req.body);
 
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        weekdayFocusHours: true,
+        weekendFocusHours: true,
+        lifeSeason: true,
+        reliabilityScore: true,
+        antiGoals: true,
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const now = new Date();
     const defaultEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
@@ -167,10 +192,15 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
           title: g.title,
           why: g.why,
           deadline: g.endDate ? new Date(g.endDate) : defaultEnd,
+          skillLevel: (g as any).skillLevel, // Skill level from payload if provided
         })),
         {
-          currentLoad: 0, // Could be fetched from DB if needed
-          weeklyHours: 40,
+          currentLoad: 0,
+          weekdayFocusHours: user.weekdayFocusHours,
+          weekendFocusHours: user.weekendFocusHours,
+          lifeSeason: user.lifeSeason,
+          reliabilityScore: user.reliabilityScore,
+          antiGoals: user.antiGoals,
         }
       );
 
@@ -187,6 +217,9 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
           feasibilityComment: analysis?.analysis ?? 'Analysis missing for this goal.',
           strategicPivot: analysis?.pivot || null,
           estimatedHours: analysis?.estimatedHours,
+          impactScore: analysis?.impactScore,
+          priorityBucket: analysis?.priorityBucket,
+          suggestedQuarter: analysis?.suggestedQuarter,
         };
       });
 
