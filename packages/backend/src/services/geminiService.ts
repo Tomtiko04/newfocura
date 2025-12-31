@@ -1,6 +1,30 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../utils/logger';
-import { SnapResponse } from '@focura/shared';
+// Local SnapResponse shape to avoid shared dependency
+type SnapSubtask = {
+  title: string;
+  duration_estimate: number;
+};
+
+type SnapItem = {
+  type: 'task' | 'goal' | 'reflection';
+  original_text: string;
+  priority?: number;
+  energy_requirement?: string;
+  implementation_intention?: string;
+  subtasks: SnapSubtask[];
+  feasibility_warning?: string;
+};
+
+type SnapResponse = {
+  summary: string;
+  extracted_items: SnapItem[];
+  daily_structure: {
+    morning_peak: string[];
+    afternoon_admin: string[];
+    evening_reflection: string[];
+  };
+};
 
 export enum ThinkingLevel {
   MINIMAL = 'minimal',
@@ -16,8 +40,11 @@ export class GeminiService {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not configured');
     }
-    this.client = new GoogleGenerativeAI(apiKey);
-    this.model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // @ts-ignore apiVersion supported in v1beta but may be missing in types
+    this.client = new GoogleGenerativeAI(apiKey, { apiVersion: 'v1beta' });
+    this.model = this.client.getGenerativeModel({
+      model: 'gemini-3-flash-preview',
+    }, { apiVersion: 'v1beta' }); // Force apiVersion in requestOptions as well
   }
 
   /**
@@ -44,7 +71,6 @@ export class GeminiService {
           ],
         }],
         generationConfig: {
-          responseMimeType: 'application/json',
           temperature: 0.7,
         },
         // MINIMAL thinking level for low latency
@@ -54,7 +80,7 @@ export class GeminiService {
       const text = response.text();
       
       // Parse JSON response
-      const parsed = JSON.parse(text) as SnapResponse;
+      const parsed = this.extractJSON(text) as SnapResponse;
       
       // Validate response structure
       this.validateSnapResponse(parsed);
@@ -67,36 +93,123 @@ export class GeminiService {
   }
 
   /**
-   * Analyze goal feasibility with HIGH thinking level for deep reasoning
+   * Analyze goal portfolio holistically with HIGH thinking level for deep reasoning
    */
-  async analyzeGoalFeasibility(
-    goal: { title: string; description: string; deadline: Date },
+  async analyzeGoalPortfolio(
+    goals: Array<{ title: string; why?: string; deadline: Date }>,
     userContext: { currentLoad: number; weeklyHours: number }
-  ): Promise<{ score: number; analysis: string; pivot?: string }> {
-    const prompt = this.getFeasibilityPrompt(goal, userContext);
+  ): Promise<{
+    summary: string;
+    results: Array<{ 
+      title: string; 
+      score: number; 
+      analysis: string; 
+      pivot?: string; 
+      estimatedHours?: number 
+    }>
+  }> {
+    const prompt = this.getPortfolioPrompt(goals, userContext);
     
     try {
       const result = await this.model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
+          temperature: 1.0, 
           responseMimeType: 'application/json',
-          temperature: 0.3, // Lower temperature for more consistent analysis
+          // @ts-ignore Gemini 3 thinking config
+          thinkingConfig: {
+            includeThoughts: false,
+            thinkingLevel: 'high',
+          },
         },
-        // HIGH thinking level for deep reasoning
       });
 
-      const response = result.response.text();
-      const parsed = JSON.parse(response);
+      const responseText = result.response.text();
+      const parsed = this.extractJSON(responseText);
       
+      if (!parsed.results || !Array.isArray(parsed.results)) {
+        throw new Error('Invalid portfolio analysis structure');
+      }
+
+      const results = parsed.results.map((r: any) => {
+        let analysisText = '';
+        if (typeof r.analysis === 'object') {
+          analysisText = r.analysis.summary || '';
+          if (r.analysis.challenges?.length) {
+            analysisText += '\n\nChallenges:\n- ' + r.analysis.challenges.join('\n- ');
+          }
+          if (r.analysis.opportunities?.length) {
+            analysisText += '\n\nOpportunities:\n- ' + r.analysis.opportunities.join('\n- ');
+          }
+        } else {
+          analysisText = r.analysis || '';
+        }
+
+        return {
+          title: r.title,
+          score: r.feasibilityScore ?? 0,
+          analysis: analysisText,
+          pivot: r.strategicPivot,
+          estimatedHours: r.estimatedHoursRequired,
+        };
+      });
+
       return {
-        score: parsed.feasibilityScore || 0,
-        analysis: parsed.analysis || '',
-        pivot: parsed.strategicPivot,
+        summary: parsed.portfolioSummary || '',
+        results
       };
     } catch (error) {
-      logger.error('Gemini feasibility analysis error:', error);
-      throw new Error(`Failed to analyze goal feasibility: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      logger.error('Gemini portfolio reasoning error:', error);
+      throw new Error(`Failed to analyze goal portfolio: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private getPortfolioPrompt(
+    goals: Array<{ title: string; why?: string; deadline: Date }>,
+    userContext: { currentLoad: number; weeklyHours: number }
+  ): string {
+    const goalsXml = goals.map((g, i) => `
+<goal id="${i + 1}">
+  <title>${g.title}</title>
+  <reasoning>${g.why ?? 'Not provided'}</reasoning>
+  <deadline>${g.deadline.toISOString()}</deadline>
+</goal>`).join('');
+
+    return `System: You are an expert productivity coach and project portfolio analyst. Your task is to perform a "Holistic Portfolio Pass" on a user's yearly goals.
+
+User Context:
+- Current task load: ${userContext.currentLoad} active tasks
+- Available hours: ${userContext.weeklyHours} hours/week
+
+Goal Portfolio:
+${goalsXml}
+
+Task:
+1. RESOURCE ALLOCATION: Estimate the weekly hours required for EACH goal.
+2. CAPACITY CHECK: Compare the cumulative hours against the user's 100% capacity (${userContext.weeklyHours} hrs/week).
+3. CONFLICT DETECTION: Identify cognitive or resource conflicts between goals (e.g., two high-focus skills being learned simultaneously).
+4. REASONING: Explain how these goals interact. If the portfolio is over-capacity, suggest which goals to pivot or postpone.
+
+Output Requirements:
+Return ONLY a valid JSON object with this structure:
+{
+  "portfolioSummary": "Overall assessment of the entire goal set",
+  "results": [
+    {
+      "title": "exact title from input",
+      "feasibilityScore": number (0-100),
+      "estimatedHoursRequired": number (total for the year),
+      "analysis": {
+         "summary": "How this specific goal fits into the portfolio",
+         "challenges": ["string"],
+         "opportunities": ["string"]
+      },
+      "strategicPivot": "string or null"
+    }
+  ]
+}
+
+IMPORTANT: Total capacity reasoning must inform the individual feasibility scores. If the portfolio is overloaded, scores must reflect that risk.`;
   }
 
   /**
@@ -112,14 +225,13 @@ export class GeminiService {
       const result = await this.model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          responseMimeType: 'application/json',
           temperature: 0.5,
         },
         // HIGH thinking level for deep reasoning
       });
 
       const response = result.response.text();
-      const parsed = JSON.parse(response);
+      const parsed = this.extractJSON(response);
       
       return {
         insights: parsed.insights || '',
@@ -161,7 +273,7 @@ export class GeminiService {
       });
 
       const response = result.response.text();
-      const parsed = JSON.parse(response);
+      const parsed = this.extractJSON(response);
       
       return {
         sleepDebt: parsed.sleepDebt || 0,
@@ -205,7 +317,7 @@ export class GeminiService {
       });
 
       const response = result.response.text();
-      const parsed = JSON.parse(response);
+      const parsed = this.extractJSON(response);
       
       return {
         restructuredTasks: parsed.restructuredTasks || [],
@@ -253,33 +365,6 @@ Return ONLY a valid JSON object matching this structure:
     "afternoon_admin": ["task_ids"],
     "evening_reflection": ["task_ids"]
   }
-}`;
-  }
-
-  private getFeasibilityPrompt(
-    goal: { title: string; description: string; deadline: Date },
-    userContext: { currentLoad: number; weeklyHours: number }
-  ): string {
-    return `Analyze the feasibility of this goal:
-
-Goal: ${goal.title}
-Description: ${goal.description}
-Deadline: ${goal.deadline.toISOString()}
-
-User Context:
-- Current task load: ${userContext.currentLoad} active tasks
-- Weekly working hours: ${userContext.weeklyHours} hours/week
-
-Provide a feasibility analysis with:
-1. Feasibility score (0-100)
-2. Detailed analysis of challenges and opportunities
-3. Strategic pivot suggestion if score < 60
-
-Return JSON:
-{
-  "feasibilityScore": 0-100,
-  "analysis": "Detailed analysis text",
-  "strategicPivot": "Suggested pivot or null"
 }`;
   }
 
@@ -374,6 +459,53 @@ Return JSON:
     "description": "Micro-win description"
   }
 }`;
+  }
+
+  private extractJSON(text: string): any {
+    try {
+      // Try direct parse first
+      return JSON.parse(text);
+    } catch (e) {
+      // Look for the largest block starting with '{' and ending with '}'
+      // We start from the beginning for the first brace and end for the last
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
+
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+        logger.error('No JSON block found in text', { text });
+        throw new Error('No valid JSON structure found');
+      }
+
+      // We try to find the longest substring that is a valid JSON
+      // Sometimes models output multiple { } blocks, we want the one that matches our expected structure
+      // For now, we take the outer-most braces
+      const jsonCandidate = text.substring(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(jsonCandidate);
+      } catch (innerError) {
+        // If outer-most fails, try to find a valid block by narrowing down
+        // (common if model adds markdown around JSON)
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.startsWith('{')) {
+            let potentialJson = '';
+            for (let j = i; j < lines.length; j++) {
+              potentialJson += lines[j];
+              if (lines[j].trim().endsWith('}')) {
+                try {
+                  return JSON.parse(potentialJson);
+                } catch (err) {
+                  // Keep going
+                }
+              }
+            }
+          }
+        }
+        logger.error('JSON extraction failed after multiple attempts', { text });
+        throw new Error('Failed to parse response as JSON');
+      }
+    }
   }
 
   private validateSnapResponse(response: any): void {

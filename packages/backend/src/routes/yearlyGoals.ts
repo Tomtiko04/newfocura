@@ -85,6 +85,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       feasibilityScore: z.number().optional(),
       feasibilityComment: z.string().optional(),
       strategicPivot: z.string().optional(),
+      estimatedHours: z.number().optional(),
       priorityOrder: z.number().int().optional(),
     }).parse(req.body);
 
@@ -103,6 +104,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         ...('feasibilityScore' in payload ? { feasibilityScore: payload.feasibilityScore } : {}),
         ...('feasibilityComment' in payload ? { feasibilityComment: payload.feasibilityComment } : {}),
         ...('strategicPivot' in payload ? { strategicPivot: payload.strategicPivot } : {}),
+        ...('estimatedHours' in payload ? { estimatedHours: payload.estimatedHours } : {}),
         ...('priorityOrder' in payload ? { priorityOrder: payload.priorityOrder } : {}),
       },
     });
@@ -155,41 +157,50 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
 
     const { goals } = batchSchema.parse(req.body);
 
-    const results = [];
     const now = new Date();
     const defaultEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    for (const goal of goals) {
-      const feasibility = await geminiService.analyzeGoalFeasibility(
+    try {
+      // Perform holistic portfolio analysis in a single AI request
+      const { results: portfolioResults, summary } = await geminiService.analyzeGoalPortfolio(
+        goals.map(g => ({
+          title: g.title,
+          why: g.why,
+          deadline: g.endDate ? new Date(g.endDate) : defaultEnd,
+        })),
         {
-          title: goal.title,
-          description: '', // description removed; keep empty for model prompt
-          deadline: goal.endDate ? new Date(goal.endDate) : defaultEnd,
-        },
-        {
-          currentLoad: 0,
+          currentLoad: 0, // Could be fetched from DB if needed
           weeklyHours: 40,
         }
       );
 
-      results.push({
-        title: goal.title,
-        why: goal.why,
-        startDate: goal.startDate,
-        endDate: goal.endDate,
-        feasibilityScore: feasibility.score,
-        feasibilityComment: feasibility.analysis,
-        strategicPivot: feasibility.pivot || null,
+      // Map portfolio results back to the requested goals to maintain original metadata
+      const results = goals.map(originalGoal => {
+        const analysis = portfolioResults.find(r => r.title === originalGoal.title);
+        
+        return {
+          title: originalGoal.title,
+          why: originalGoal.why,
+          startDate: originalGoal.startDate,
+          endDate: originalGoal.endDate,
+          feasibilityScore: analysis?.score ?? 0,
+          feasibilityComment: analysis?.analysis ?? 'Analysis missing for this goal.',
+          strategicPivot: analysis?.pivot || null,
+          estimatedHours: analysis?.estimatedHours,
+        };
       });
-    }
 
-    res.json({ results });
+      res.json({ results, summary });
+    } catch (error) {
+      logger.error('Yearly goals portfolio analysis error:', error);
+      res.status(500).json({ error: 'Failed to analyze goal portfolio' });
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
-    logger.error('Yearly goals feasibility error:', error);
-    res.status(500).json({ error: 'Failed to analyze yearly goals' });
+    logger.error('Yearly goals feasibility route error:', error);
+    res.status(500).json({ error: 'Internal server error during analysis' });
   }
 });
 

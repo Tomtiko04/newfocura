@@ -62,6 +62,7 @@ model YearlyGoal {
   feasibilityScore   Float?
   feasibilityComment String?
   strategicPivot     String?
+  estimatedHours     Float?
   priorityOrder      Int?
   status             String   @default("draft") // draft, analyzed, finalized
   createdAt          DateTime @default(now())

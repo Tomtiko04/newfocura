@@ -177,15 +177,26 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                         onPressed: state.goals.isEmpty
                             ? null
                             : () async {
-                                final results = await notifier.analyzeAll();
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        results.isEmpty ? 'Analysis failed' : 'Analysis complete',
+                                try {
+                                  final results = await notifier.analyzeAll();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          results.isEmpty ? 'Analysis failed' : 'Analysis complete',
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Analysis failed: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
                                 }
                               },
                         icon: const Icon(Icons.analytics),
@@ -247,25 +258,55 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
                             ),
                             if (analysis.feasibilityScore != null)
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Row(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: LinearProgressIndicator(
-                                        value: (analysis.feasibilityScore ?? 0) / 100,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: LinearProgressIndicator(
+                                            value: (analysis.feasibilityScore ?? 0) / 100,
+                                            backgroundColor: Colors.grey[200],
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              _getScoreColor(analysis.feasibilityScore ?? 0),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${analysis.feasibilityScore?.toStringAsFixed(0) ?? '--'}%',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: _getScoreColor(analysis.feasibilityScore ?? 0),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text('${analysis.feasibilityScore?.toStringAsFixed(0) ?? '--'}%'),
+                                    if (analysis.estimatedHours != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          'Estimated Time: ${analysis.estimatedHours!.toStringAsFixed(0)} hours',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
                             if (analysis.feasibilityComment != null)
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  analysis.feasibilityComment!,
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    analysis.feasibilityComment!,
+                                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                  ),
                                 ),
                               ),
                             if (analysis.strategicPivot != null)
@@ -495,6 +536,13 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> {
     } finally {
       if (mounted) setState(() => _isImporting = false);
     }
+  }
+
+  Color _getScoreColor(double score) {
+    if (score >= 80) return Colors.green;
+    if (score >= 60) return Colors.orange;
+    if (score >= 40) return Colors.amber;
+    return Colors.red;
   }
 }
 
