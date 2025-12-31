@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_service.dart';
+import 'package:dio/dio.dart';
 
 class YearlyGoal {
   final String id;
@@ -141,6 +142,9 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     DateTime? endDate,
   }) async {
     try {
+      // Debug logging
+      // ignore: avoid_print
+      print('Adding yearly goal: title=$title, why=$why, start=$startDate, end=$endDate');
       final resp = await _api.post('/yearly-goals', data: {
         'title': title,
         if (why != null && why.isNotEmpty) 'why': why,
@@ -152,7 +156,13 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('Add yearly goal error: $e');
+      if (e is DioException) {
+        // ignore: avoid_print
+        print('Response: ${e.response?.data}, status: ${e.response?.statusCode}');
+      }
       return false;
     }
   }
@@ -214,7 +224,14 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
           'endDate': g.endDate?.toIso8601String(),
         }).toList(),
       };
+      // ignore: avoid_print
+      print('Analyze yearly goals payload: $payload');
       final resp = await _api.post('/yearly-goals/feasibility', data: payload);
+      // ignore: avoid_print
+      print('Analyze response status: ${resp.statusCode}, data: ${resp.data}');
+      if (resp.statusCode != 200 || resp.data['results'] == null) {
+        return [];
+      }
       final results = (resp.data['results'] as List<dynamic>).map((r) {
         return GoalAnalysis(
           title: r['title'],

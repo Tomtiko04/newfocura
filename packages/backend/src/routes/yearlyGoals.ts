@@ -11,8 +11,8 @@ const prisma = new PrismaClient();
 const yearlyGoalSchema = z.object({
   title: z.string().min(1),
   why: z.string().optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().optional().nullable(), // relaxed: allow plain ISO without offset
+  endDate: z.string().optional().nullable(),   // relaxed
 });
 
 const batchSchema = z.object({
@@ -26,6 +26,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    logger.info('Create yearly goal request', { userId: req.userId, body: req.body });
     const payload = yearlyGoalSchema.parse(req.body);
     const now = new Date();
     const defaultStart = new Date(now.getFullYear(), 0, 1);
@@ -78,6 +79,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    logger.info('Update yearly goal request', { userId: req.userId, body: req.body, id: req.params.id });
     const payload = yearlyGoalSchema.partial().extend({
       status: z.enum(['draft', 'analyzed', 'finalized']).optional(),
       feasibilityScore: z.number().optional(),
@@ -91,8 +93,12 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       data: {
         ...('title' in payload ? { title: payload.title } : {}),
         ...('why' in payload ? { why: payload.why } : {}),
-        ...('startDate' in payload && payload.startDate ? { startDate: new Date(payload.startDate) } : {}),
-        ...('endDate' in payload && payload.endDate ? { endDate: new Date(payload.endDate) } : {}),
+        ...('startDate' in payload
+            ? { startDate: payload.startDate ? new Date(payload.startDate) : null }
+            : {}),
+        ...('endDate' in payload
+            ? { endDate: payload.endDate ? new Date(payload.endDate) : null }
+            : {}),
         ...('status' in payload ? { status: payload.status } : {}),
         ...('feasibilityScore' in payload ? { feasibilityScore: payload.feasibilityScore } : {}),
         ...('feasibilityComment' in payload ? { feasibilityComment: payload.feasibilityComment } : {}),
@@ -144,6 +150,8 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
     if (!req.userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    logger.info('Batch feasibility request', { userId: req.userId, body: req.body });
 
     const { goals } = batchSchema.parse(req.body);
 

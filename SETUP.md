@@ -10,16 +10,19 @@
 ## Backend Setup
 
 1. Navigate to backend directory:
+
 ```bash
 cd packages/backend
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Set up environment variables:
+
 ```bash
 # Create .env file (copy from example if it exists, or create manually)
 # The DATABASE_URL should match your docker-compose.yml PostgreSQL setup:
@@ -34,6 +37,7 @@ DATABASE_URL="postgresql://focura_user:password@localhost:5432/focura?schema=pub
 ```
 
 Or create `.env` file manually with:
+
 ```
 DATABASE_URL="postgresql://user:password@localhost:5432/focura?schema=public"
 GEMINI_API_KEY=your-gemini-api-key
@@ -47,21 +51,33 @@ CORS_ORIGIN=http://localhost:3000
 ```
 
 4. Start PostgreSQL with Docker:
+
 ```bash
 docker-compose up -d
 ```
 
 5. Generate Prisma Client:
+
 ```bash
 npm run db:generate
 ```
 
 6. Run database migrations:
+
 ```bash
 npm run db:migrate
 ```
 
+Another method:
+
+```bash
+cd packages/backend
+   npx prisma migrate dev --name add_yearly_goal_dates
+   npx prisma generate
+```
+
 7. Start the backend server:
+
 ```bash
 npm run dev
 ```
@@ -71,11 +87,13 @@ The backend will be running on `http://localhost:3000`
 ## Frontend Setup
 
 1. Navigate to mobile directory:
+
 ```bash
 cd packages/mobile
 ```
 
 2. Install Flutter dependencies:
+
 ```bash
 flutter pub get
 ```
@@ -83,6 +101,7 @@ flutter pub get
 3. Update API base URL in `lib/services/api_service.dart` if needed (default: `http://localhost:3000/api`)
 
 4. Run the app:
+
 ```bash
 flutter run
 ```
@@ -92,6 +111,7 @@ flutter run
 ### Backend (.env)
 
 Required:
+
 - `DATABASE_URL` - PostgreSQL connection string
 - `GEMINI_API_KEY` - Google Gemini API key
 - `PINECONE_API_KEY` - Pinecone API key
@@ -100,6 +120,7 @@ Required:
 - `JWT_SECRET` - Secret for JWT token signing
 
 Optional:
+
 - `PORT` - Server port (default: 3000)
 - `CORS_ORIGIN` - CORS origin (default: http://localhost:3000)
 - `PRISMA_ACCELERATE_URL` - Prisma Accelerate URL for production scaling
@@ -107,6 +128,7 @@ Optional:
 ## Database Schema
 
 The Prisma schema includes:
+
 - Users (with OAuth support)
 - Goals (with feasibility scoring)
 - Tasks (with subtasks and implementation intentions)
@@ -120,6 +142,7 @@ The Prisma schema includes:
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/register` - Register with email/password
 - `POST /api/auth/login` - Login with email/password
 - `POST /api/auth/oauth/google` - Google OAuth (placeholder)
@@ -127,10 +150,12 @@ The Prisma schema includes:
 - `GET /api/auth/me` - Get current user
 
 ### Snap Processing
+
 - `POST /api/snap/upload` - Upload and process image
 - `GET /api/snap/:snapId/status` - Get snap processing status
 
 ### Goals
+
 - `POST /api/goals` - Create goal (with feasibility analysis)
 - `GET /api/goals` - Get all goals
 - `GET /api/goals/:id` - Get goal by ID
@@ -138,6 +163,7 @@ The Prisma schema includes:
 - `DELETE /api/goals/:id` - Delete goal
 
 ### Tasks
+
 - `POST /api/tasks` - Create task
 - `GET /api/tasks` - Get all tasks
 - `GET /api/tasks/:id` - Get task by ID
@@ -146,22 +172,27 @@ The Prisma schema includes:
 - `DELETE /api/tasks/:id` - Delete task
 
 ### Morning Sync
+
 - `POST /api/morning-sync` - Submit morning sync data
 - `GET /api/morning-sync/today` - Get today's morning sync
 - `POST /api/morning-sync/peaks` - Record actual energy peak
 
 ### Schedule
+
 - `POST /api/schedule/generate` - Generate daily schedule
 - `GET /api/schedule/today` - Get today's schedule
 
 ### PFC Shield
+
 - `POST /api/pfc-shield/restructure` - Restructure schedule due to interruption
 
 ### Momentum
+
 - `GET /api/momentum/today` - Get today's momentum score
 - `POST /api/momentum/store` - Store momentum score
 
 ### Weekly Strategy
+
 - `POST /api/weekly-strategy/generate` - Generate weekly strategy analysis
 
 ## Features Implemented
@@ -192,4 +223,3 @@ The Prisma schema includes:
 - Implement voice analysis features
 - Add accountability system (social features)
 - Deploy to production
-
