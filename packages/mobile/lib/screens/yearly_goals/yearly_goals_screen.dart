@@ -69,6 +69,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
 
   Widget _buildPlanningTab(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
     final userReality = ref.watch(userProvider).value;
+    final hasAnalysis = state.analysisResults.isNotEmpty;
     
     // Reality Alert Logic
     double totalHours = 0;
@@ -97,6 +98,8 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           children: [
             if (isOverCapacity && userReality != null)
               _buildRealityAlert(totalHours, yearlyCapacity),
+            if (hasAnalysis)
+              _buildNextStepsCard(notifier, state),
             _buildAddGoalCard(notifier),
             const SizedBox(height: 16),
             _buildActionHeader(state, notifier),
@@ -104,6 +107,68 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
             _buildGoalsList(state, notifier),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNextStepsCard(YearlyGoalsNotifier notifier, YearlyGoalsState state) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        border: Border.all(color: Colors.green[200]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.green[700]),
+              const SizedBox(width: 8),
+              Text(
+                'Analysis Complete: Next Steps',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green[900]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '1. Review the "Strategic Pivot" and "Challenges" for each goal below.',
+            style: TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '2. Check the "Roadmap" tab to see your new sequence (Q1-Q4).',
+            style: TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '3. Click "Finalize" below to lock in this plan.',
+            style: TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await notifier.finalizeAllWithAnalysis(state.analysisResults);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Yearly goals finalized')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Finalize Plan Now'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -504,14 +569,24 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
       return const Center(child: Text('No goals yet. Switch to Planning to add some.'));
     }
 
+    final isPreview = state.analysisResults.isNotEmpty;
+
     // Group goals by suggested quarter
-    final quarters = <int, List<YearlyGoal>>{
+    final quarters = <int, List<dynamic>>{
       1: [], 2: [], 3: [], 4: [],
     };
     
-    for (final goal in state.goals) {
-      final q = goal.suggestedQuarter ?? 1;
-      quarters[q]?.add(goal);
+    // If we have analysis results, use them as a "Preview"
+    if (isPreview) {
+      for (final analysis in state.analysisResults) {
+        final q = analysis.suggestedQuarter ?? 1;
+        quarters[q]?.add(analysis);
+      }
+    } else {
+      for (final goal in state.goals) {
+        final q = goal.suggestedQuarter ?? 1;
+        quarters[q]?.add(goal);
+      }
     }
 
     return SingleChildScrollView(
@@ -519,13 +594,35 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isPreview)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.indigo[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.indigo[100]!),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 16, color: Colors.indigo),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'PREVIEW: This roadmap is proposed by Gemini. Click "Finalize" in the Planning tab to lock it in.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const Text(
             'Staggered Execution Plan',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           ...[1, 2, 3, 4].map((q) {
-            final goals = quarters[q]!;
+            final items = quarters[q]!;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -536,8 +633,8 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                       Container(
                         width: 40,
                         height: 40,
-                        decoration: const BoxDecoration(
-                          color: Colors.indigo,
+                        decoration: BoxDecoration(
+                          color: isPreview ? Colors.indigo[300] : Colors.indigo,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -555,24 +652,29 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                     ],
                   ),
                 ),
-                if (goals.isEmpty)
+                if (items.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(left: 52, bottom: 16),
                     child: Text('No goals scheduled for this quarter.', style: TextStyle(color: Colors.grey, fontSize: 12)),
                   )
                 else
-                  ...goals.map((g) => Padding(
-                    padding: const EdgeInsets.only(left: 52, bottom: 8),
-                    child: Card(
-                      child: ListTile(
-                        dense: true,
-                        title: Text(g.title),
-                        subtitle: g.priorityBucket != null 
-                          ? Text('Bucket ${g.priorityBucket}', style: TextStyle(color: _getBucketColor(g.priorityBucket!)))
-                          : null,
+                  ...items.map((item) {
+                    final String title = item is YearlyGoal ? item.title : (item as GoalAnalysis).title;
+                    final String? bucket = item is YearlyGoal ? item.priorityBucket : (item as GoalAnalysis).priorityBucket;
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 52, bottom: 8),
+                      child: Card(
+                        child: ListTile(
+                          dense: true,
+                          title: Text(title),
+                          subtitle: bucket != null 
+                            ? Text('Bucket $bucket', style: TextStyle(color: _getBucketColor(bucket)))
+                            : null,
+                        ),
                       ),
-                    ),
-                  )),
+                    );
+                  }),
               ],
             );
           }),

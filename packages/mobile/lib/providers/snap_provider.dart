@@ -30,13 +30,9 @@ class SnapService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       
-      // Use 10.0.2.2 for Android emulator to access host machine's localhost
-      final baseUrl = Platform.isAndroid 
-          ? 'http://10.0.2.2:3000/api/v1'
-          : 'http://localhost:3000/api/v1';
-      
+      // Use the same baseUrl configuration as ApiService
       final dio = Dio(BaseOptions(
-        baseUrl: baseUrl,
+        baseUrl: ApiService.baseUrl,
         headers: {
           'Authorization': 'Bearer $token',
         },
