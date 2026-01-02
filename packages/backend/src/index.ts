@@ -34,6 +34,7 @@ import scheduleRoutes from './routes/schedule';
 import weeklyStrategyRoutes from './routes/weeklyStrategy';
 import yearlyGoalsRoutes from './routes/yearlyGoals';
 import userRoutes from './routes/user';
+import letterRoutes from './routes/letters';
 
 // API v1 routes
 app.use('/api/v1/auth', authRoutes);
@@ -47,6 +48,7 @@ app.use('/api/v1/momentum', momentumRoutes);
 app.use('/api/v1/schedule', scheduleRoutes);
 app.use('/api/v1/weekly-strategy', weeklyStrategyRoutes);
 app.use('/api/v1/yearly-goals', yearlyGoalsRoutes);
+app.use('/api/v1/letters', letterRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

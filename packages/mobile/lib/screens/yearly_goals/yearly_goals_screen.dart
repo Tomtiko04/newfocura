@@ -158,6 +158,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Yearly goals finalized')),
                   );
+                  _showFutureLetterDialog();
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -397,6 +398,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Yearly goals finalized')),
                         );
+                        _showFutureLetterDialog();
                       }
                     },
               icon: const Icon(Icons.check_circle),
@@ -609,7 +611,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'PREVIEW: This roadmap is proposed by Gemini. Click "Finalize" in the Planning tab to lock it in.',
+                      'PREVIEW: Drag goals between quarters to re-sequence. Click "Finalize" in Planning to save.',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
                     ),
                   ),
@@ -623,62 +625,130 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           const SizedBox(height: 16),
           ...[1, 2, 3, 4].map((q) {
             final items = quarters[q]!;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: isPreview ? Colors.indigo[300] : Colors.indigo,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Q$q',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            return DragTarget<Object>(
+              onWillAccept: (data) => true,
+              onAccept: (data) {
+                if (data is GoalAnalysis) {
+                  notifier.updatePreviewQuarter(data.title, q);
+                } else if (data is YearlyGoal) {
+                  notifier.updateGoalQuarter(data.id, q);
+                }
+              },
+              builder: (context, candidateData, rejectedData) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: candidateData.isNotEmpty 
+                                ? Colors.green 
+                                : (isPreview ? Colors.indigo[300] : Colors.indigo),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Q$q',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _getQuarterLabel(q),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _getQuarterLabel(q),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 52, bottom: 16),
-                    child: Text('No goals scheduled for this quarter.', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  )
-                else
-                  ...items.map((item) {
-                    final String title = item is YearlyGoal ? item.title : (item as GoalAnalysis).title;
-                    final String? bucket = item is YearlyGoal ? item.priorityBucket : (item as GoalAnalysis).priorityBucket;
-                    
-                    return Padding(
+                    ),
+                    Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(minHeight: 40),
                       padding: const EdgeInsets.only(left: 52, bottom: 8),
-                      child: Card(
-                        child: ListTile(
-                          dense: true,
-                          title: Text(title),
-                          subtitle: bucket != null 
-                            ? Text('Bucket $bucket', style: TextStyle(color: _getBucketColor(bucket)))
-                            : null,
-                        ),
+                      decoration: BoxDecoration(
+                        color: candidateData.isNotEmpty ? Colors.indigo.withOpacity(0.05) : null,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    );
-                  }),
-              ],
+                      child: items.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text('No goals scheduled for this quarter.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          )
+                        : Column(
+                            children: items.map((item) {
+                              return LongPressDraggable<Object>(
+                                data: item as Object,
+                                feedback: Material(
+                                  elevation: 4,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: MediaQuery.of(context).size.width * 0.7,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.indigo),
+                                    ),
+                                    child: Text(
+                                      item is YearlyGoal ? item.title : (item as GoalAnalysis).title,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                                childWhenDragging: Opacity(
+                                  opacity: 0.5,
+                                  child: _buildRoadmapCard(item, notifier),
+                                ),
+                                child: _buildRoadmapCard(item, notifier),
+                              );
+                            }).toList(),
+                          ),
+                    ),
+                  ],
+                );
+              },
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRoadmapCard(dynamic item, YearlyGoalsNotifier notifier) {
+    final String title = item is YearlyGoal ? item.title : (item as GoalAnalysis).title;
+    final String? bucket = item is YearlyGoal ? item.priorityBucket : (item as GoalAnalysis).priorityBucket;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          dense: true,
+          title: Text(title),
+          subtitle: bucket != null 
+            ? Text('Bucket $bucket', style: TextStyle(color: _getBucketColor(bucket)))
+            : null,
+          trailing: PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, size: 18),
+            onSelected: (val) {
+              if (item is GoalAnalysis) {
+                notifier.updatePreviewBucket(title, val);
+              } else if (item is YearlyGoal) {
+                notifier.updateGoalBucket(item.id, val);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'A', child: Text('Move to Bucket A')),
+              const PopupMenuItem(value: 'B', child: Text('Move to Bucket B')),
+              const PopupMenuItem(value: 'C', child: Text('Move to Bucket C')),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -945,6 +1015,73 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     if (score >= 60) return Colors.orange;
     if (score >= 40) return Colors.amber;
     return Colors.red;
+  }
+
+  void _showFutureLetterDialog() {
+    final letterController = TextEditingController();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.mail_outline, color: Colors.indigo),
+              SizedBox(width: 8),
+              Text('Letter to Future Self'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Congratulations on finalizing your 2026 strategy! Write a letter to yourself that you will open on December 31, 2026.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: letterController,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: 'Dear Future Me, in 2026 I hope we achieved...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+              child: const Text('Skip for now'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (letterController.text.trim().isEmpty) return;
+                
+                setDialogState(() => isSaving = true);
+                final ok = await ref.read(yearlyGoalsProvider.notifier).saveFutureLetter(
+                  letterController.text.trim(),
+                );
+                
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(ok ? 'Letter sealed until Dec 31!' : 'Failed to save letter'),
+                    ),
+                  );
+                }
+              },
+              child: isSaving 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Seal Letter'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

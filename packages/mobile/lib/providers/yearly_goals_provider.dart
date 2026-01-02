@@ -119,6 +119,25 @@ class GoalAnalysis {
     this.priorityBucket,
     this.suggestedQuarter,
   });
+
+  GoalAnalysis copyWith({
+    int? suggestedQuarter,
+    String? priorityBucket,
+  }) {
+    return GoalAnalysis(
+      title: title,
+      why: why,
+      startDate: startDate,
+      endDate: endDate,
+      feasibilityScore: feasibilityScore,
+      feasibilityComment: feasibilityComment,
+      strategicPivot: strategicPivot,
+      estimatedHours: estimatedHours,
+      impactScore: impactScore,
+      priorityBucket: priorityBucket ?? this.priorityBucket,
+      suggestedQuarter: suggestedQuarter ?? this.suggestedQuarter,
+    );
+  }
 }
 
 class YearlyGoalsState {
@@ -331,6 +350,41 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
       );
     }
     await loadGoals();
+  }
+
+  void updatePreviewQuarter(String title, int quarter) {
+    state = state.copyWith(
+      analysisResults: state.analysisResults.map((a) {
+        if (a.title == title) return a.copyWith(suggestedQuarter: quarter);
+        return a;
+      }).toList(),
+    );
+  }
+
+  void updatePreviewBucket(String title, String bucket) {
+    state = state.copyWith(
+      analysisResults: state.analysisResults.map((a) {
+        if (a.title == title) return a.copyWith(priorityBucket: bucket);
+        return a;
+      }).toList(),
+    );
+  }
+
+  Future<void> updateGoalQuarter(String id, int quarter) async {
+    await updateGoal(id, suggestedQuarter: quarter);
+  }
+
+  Future<void> updateGoalBucket(String id, String bucket) async {
+    await updateGoal(id, priorityBucket: bucket);
+  }
+
+  Future<bool> saveFutureLetter(String content) async {
+    try {
+      final resp = await _api.post('/letters', data: {'content': content});
+      return resp.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
