@@ -98,6 +98,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       baselineValue: z.string().optional(),
       failureRisk: z.string().optional(),
       recoveryStrategy: z.string().optional(),
+      identityTitle: z.string().optional(),
     }).parse(req.body);
 
     const updated = await prisma.yearlyGoal.updateMany({
@@ -126,6 +127,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         ...('baselineValue' in payload ? { baselineValue: payload.baselineValue } : {}),
         ...('failureRisk' in payload ? { failureRisk: payload.failureRisk } : {}),
         ...('recoveryStrategy' in payload ? { recoveryStrategy: payload.recoveryStrategy } : {}),
+        ...('identityTitle' in payload ? { identityTitle: payload.identityTitle } : {}),
       },
     });
 
@@ -231,6 +233,7 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
           priorityBucket: analysis?.priorityBucket,
           suggestedQuarter: analysis?.suggestedQuarter,
           aiBaselinePrompt: analysis?.aiBaselinePrompt,
+          identityTitle: analysis?.identityTitle,
         };
       });
 

@@ -76,6 +76,7 @@ model YearlyGoal {
   baselineValue      String?
   failureRisk        String?
   recoveryStrategy   String?
+  identityTitle      String?
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

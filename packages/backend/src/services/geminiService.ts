@@ -234,6 +234,7 @@ Return ONLY a valid JSON object with this structure:
       "priorityBucket": "A | B | C",
       "suggestedQuarter": 1 | 2 | 3 | 4,
       "aiBaselinePrompt": "A specific question to ask the user about their starting point",
+      "identityTitle": "An identity-based reframe of the goal (e.g. 'I am a Writer' for a writing goal)",
       "analysis": {
          "summary": "How this fits into the user's reality",
          "challenges": ["string"],

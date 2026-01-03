@@ -23,6 +23,11 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
   bool _isImporting = false;
   late TabController _tabController;
   int _planningStep = 0; // 0: Normal, 1: Baseline, 2: Pre-Mortem, 3: Yearly Contract
+  
+  // Controllers for the multi-step strategy design
+  final Map<String, TextEditingController> _baselineControllers = {};
+  final Map<String, TextEditingController> _riskControllers = {};
+  final Map<String, TextEditingController> _recoveryControllers = {};
 
   @override
   void initState() {
@@ -35,6 +40,15 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     _titleController.dispose();
     _whyController.dispose();
     _tabController.dispose();
+    for (var c in _baselineControllers.values) {
+      c.dispose();
+    }
+    for (var c in _riskControllers.values) {
+      c.dispose();
+    }
+    for (var c in _recoveryControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -313,7 +327,10 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
       }
     }
 
-    // Start multi-step workflow instead of immediate finalize
+    // LOCK IN THE PLAN FIRST: Save buckets and quarters to database
+    await notifier.finalizeAllWithAnalysis(state.analysisResults);
+
+    // Start multi-step workflow for the Big 3
     setState(() => _planningStep = 1);
   }
 
@@ -325,12 +342,27 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
   }
 
   Widget _buildBaselineStep(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
-    final bucketA = state.goals.where((g) {
-      final analysis = state.analysisResults.firstWhere((a) => a.title == g.title, orElse: () => GoalAnalysis(title: g.title));
-      return (g.priorityBucket ?? analysis.priorityBucket) == 'A';
+    // Filter Bucket A goals based on the LATEST analysis/triage state
+    final bucketAGoals = state.goals.where((g) {
+      final analysis = state.analysisResults.firstWhere(
+        (a) => a.title == g.title, 
+        orElse: () => GoalAnalysis(title: g.title),
+      );
+      // Use analysis result bucket if it exists (latest triage), otherwise goal bucket
+      final currentBucket = (state.analysisResults.any((a) => a.title == g.title))
+          ? analysis.priorityBucket
+          : g.priorityBucket;
+      return currentBucket == 'A';
     }).toList();
 
+    if (bucketAGoals.isEmpty) {
+      // If no Bucket A goals, skip to next step or contract
+      Future.microtask(() => setState(() => _planningStep = 2));
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
+      key: const ValueKey('baseline_step_scroll'),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,11 +371,20 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           const SizedBox(height: 8),
           const Text('A goal without a starting point is just a wish. Tell Focura where you are starting today for your "Big 3" goals.', style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 32),
-          ...bucketA.map((goal) {
-            final analysis = state.analysisResults.firstWhere((a) => a.title == goal.title, orElse: () => GoalAnalysis(title: goal.title));
+          ...bucketAGoals.map((goal) {
+            final controller = _baselineControllers.putIfAbsent(
+              goal.id, 
+              () => TextEditingController(text: goal.baselineValue),
+            );
+            
+            final analysis = state.analysisResults.firstWhere(
+              (a) => a.title == goal.title, 
+              orElse: () => GoalAnalysis(title: goal.title),
+            );
             final prompt = goal.aiBaselinePrompt ?? analysis.aiBaselinePrompt ?? 'What is your current starting point for this goal?';
             
             return Card(
+              key: ValueKey('baseline_card_${goal.id}'),
               margin: const EdgeInsets.only(bottom: 24),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -355,12 +396,17 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                     Text(prompt, style: const TextStyle(fontSize: 14)),
                     const SizedBox(height: 8),
                     TextField(
-                      onChanged: (val) => goal.copyWith(baselineValue: val), // Local state would be better but for now we'll collect at end
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. Current weight: 85kg or Skill level: 2/10',
-                        border: OutlineInputBorder(),
+                      key: ValueKey('baseline_field_${goal.id}'),
+                      controller: controller,
+                      decoration: InputDecoration(
+                        labelText: 'Starting Point',
+                        hintText: prompt.toLowerCase().contains('weight') 
+                          ? 'e.g. 85kg' 
+                          : prompt.toLowerCase().contains('1-10') 
+                            ? 'e.g. 3/10' 
+                            : 'Describe your status today...',
+                        border: const OutlineInputBorder(),
                       ),
-                      controller: TextEditingController(text: goal.baselineValue),
                       onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, baselineValue: val),
                     ),
                   ],
@@ -372,7 +418,16 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => setState(() => _planningStep = 2),
+              onPressed: () async {
+                // Save all before moving
+                for (var goal in bucketAGoals) {
+                  final val = _baselineControllers[goal.id]?.text;
+                  if (val != null) {
+                    await notifier.updateGoalPlanning(goal.id, baselineValue: val);
+                  }
+                }
+                setState(() => _planningStep = 2);
+              },
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               child: const Text('Next: Planning for Obstacles'),
             ),
@@ -383,12 +438,25 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
   }
 
   Widget _buildPreMortemStep(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
-    final bucketA = state.goals.where((g) {
-      final analysis = state.analysisResults.firstWhere((a) => a.title == g.title, orElse: () => GoalAnalysis(title: g.title));
-      return (g.priorityBucket ?? analysis.priorityBucket) == 'A';
+    // Filter Bucket A goals based on the LATEST analysis/triage state
+    final bucketAGoals = state.goals.where((g) {
+      final analysis = state.analysisResults.firstWhere(
+        (a) => a.title == g.title, 
+        orElse: () => GoalAnalysis(title: g.title),
+      );
+      final currentBucket = (state.analysisResults.any((a) => a.title == g.title))
+          ? analysis.priorityBucket
+          : g.priorityBucket;
+      return currentBucket == 'A';
     }).toList();
 
+    if (bucketAGoals.isEmpty) {
+      Future.microtask(() => setState(() => _planningStep = 3));
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
+      key: const ValueKey('pre_mortem_step_scroll'),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,8 +465,18 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           const SizedBox(height: 8),
           const Text('Imagine it is December 2026 and you failed. Why did it happen? Planning for obstacles now makes you 3x more likely to succeed.', style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 32),
-          ...bucketA.map((goal) {
+          ...bucketAGoals.map((goal) {
+            final riskController = _riskControllers.putIfAbsent(
+              goal.id, 
+              () => TextEditingController(text: goal.failureRisk),
+            );
+            final recoveryController = _recoveryControllers.putIfAbsent(
+              goal.id, 
+              () => TextEditingController(text: goal.recoveryStrategy),
+            );
+
             return Card(
+              key: ValueKey('pre_mortem_card_${goal.id}'),
               margin: const EdgeInsets.only(bottom: 24),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -410,9 +488,16 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                     const Text('What is the #1 risk that could stop you?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. Burnout from work, losing interest, injury...',
-                        border: OutlineInputBorder(),
+                      key: ValueKey('risk_field_${goal.id}'),
+                      controller: riskController,
+                      decoration: InputDecoration(
+                        labelText: 'Primary Risk',
+                        hintText: goal.title.toLowerCase().contains('fitness') 
+                          ? 'e.g. Injury or loss of motivation' 
+                          : (goal.title.toLowerCase().contains('skill') || goal.title.toLowerCase().contains('learn'))
+                            ? 'e.g. Getting stuck on a complex topic'
+                            : 'What could go wrong?',
+                        border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, failureRisk: val),
                     ),
@@ -420,9 +505,14 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
                     const Text('If that happens, what is your "If-Then" recovery plan?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. If I get burnt out, I will take a 3-day total digital detox.',
-                        border: OutlineInputBorder(),
+                      key: ValueKey('recovery_field_${goal.id}'),
+                      controller: recoveryController,
+                      decoration: InputDecoration(
+                        labelText: 'Recovery Plan',
+                        hintText: goal.title.toLowerCase().contains('fitness') 
+                          ? 'e.g. If I get injured, I will focus on mobility.' 
+                          : 'e.g. If I get burnt out, I will take a 3-day detox.',
+                        border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, recoveryStrategy: val),
                     ),
@@ -435,7 +525,12 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                for (var goal in bucketAGoals) {
+                  final risk = _riskControllers[goal.id]?.text;
+                  final rec = _recoveryControllers[goal.id]?.text;
+                  await notifier.updateGoalPlanning(goal.id, failureRisk: risk, recoveryStrategy: rec);
+                }
                 _showFutureLetterDialog();
                 setState(() => _planningStep = 3);
               },
@@ -466,8 +561,8 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           const SizedBox(height: 24),
           _buildContractSection('The Big 3 (Bucket A)', ''),
           ...bucketA.map((g) => ListTile(
-            title: Text(g.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Starting from: ${g.baselineValue ?? "Not set"}'),
+            title: Text(g.identityTitle ?? g.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Starting from Q${g.suggestedQuarter ?? 1}: ${g.baselineValue ?? "Not set"}'),
             leading: const Icon(Icons.star, color: Colors.amber),
           )),
           const SizedBox(height: 24),

@@ -23,6 +23,7 @@ class YearlyGoal {
   final String? failureRisk;
   final String? recoveryStrategy;
   final String? aiBaselinePrompt;
+  final String? identityTitle;
 
   YearlyGoal({
     required this.id,
@@ -45,6 +46,7 @@ class YearlyGoal {
     this.failureRisk,
     this.recoveryStrategy,
     this.aiBaselinePrompt,
+    this.identityTitle,
   });
 
   YearlyGoal copyWith({
@@ -67,6 +69,7 @@ class YearlyGoal {
     String? failureRisk,
     String? recoveryStrategy,
     String? aiBaselinePrompt,
+    String? identityTitle,
   }) {
     return YearlyGoal(
       id: id,
@@ -89,6 +92,7 @@ class YearlyGoal {
       failureRisk: failureRisk ?? this.failureRisk,
       recoveryStrategy: recoveryStrategy ?? this.recoveryStrategy,
       aiBaselinePrompt: aiBaselinePrompt ?? this.aiBaselinePrompt,
+      identityTitle: identityTitle ?? this.identityTitle,
     );
   }
 
@@ -114,6 +118,7 @@ class YearlyGoal {
       failureRisk: json['failureRisk'],
       recoveryStrategy: json['recoveryStrategy'],
       aiBaselinePrompt: json['aiBaselinePrompt'],
+      identityTitle: json['identityTitle'],
     );
   }
 }
@@ -131,6 +136,7 @@ class GoalAnalysis {
   final String? priorityBucket;
   final int? suggestedQuarter;
   final String? aiBaselinePrompt;
+  final String? identityTitle;
 
   GoalAnalysis({
     required this.title,
@@ -145,6 +151,7 @@ class GoalAnalysis {
     this.priorityBucket,
     this.suggestedQuarter,
     this.aiBaselinePrompt,
+    this.identityTitle,
   });
 
   GoalAnalysis copyWith({
@@ -164,6 +171,7 @@ class GoalAnalysis {
       priorityBucket: priorityBucket ?? this.priorityBucket,
       suggestedQuarter: suggestedQuarter ?? this.suggestedQuarter,
       aiBaselinePrompt: aiBaselinePrompt,
+      identityTitle: identityTitle,
     );
   }
 }
@@ -269,6 +277,7 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
     String? skillLevel,
     int? priorityOrder,
     String? aiBaselinePrompt,
+    String? identityTitle,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -287,6 +296,7 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
       if (skillLevel != null) data['skillLevel'] = skillLevel;
       if (priorityOrder != null) data['priorityOrder'] = priorityOrder;
       if (aiBaselinePrompt != null) data['aiBaselinePrompt'] = aiBaselinePrompt;
+      if (identityTitle != null) data['identityTitle'] = identityTitle;
 
       final resp = await _api.put('/yearly-goals/$id', data: data);
       if (resp.statusCode == 200) {
@@ -344,6 +354,7 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
           priorityBucket: r['priorityBucket'],
           suggestedQuarter: r['suggestedQuarter'],
           aiBaselinePrompt: r['aiBaselinePrompt'],
+          identityTitle: r['identityTitle'],
         );
       }).toList();
       state = state.copyWith(
@@ -375,6 +386,7 @@ class YearlyGoalsNotifier extends StateNotifier<YearlyGoalsState> {
         priorityBucket: match.priorityBucket,
         suggestedQuarter: match.suggestedQuarter,
         aiBaselinePrompt: match.aiBaselinePrompt,
+        identityTitle: match.identityTitle,
         status: 'finalized',
       );
     }
