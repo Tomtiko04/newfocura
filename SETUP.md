@@ -75,9 +75,10 @@ cd packages/backend
    npx prisma migrate dev --name add_yearly_goal_dates
    npx prisma generate
    # Deployment
+   $env:DATABASE_URL="postgresql://focuradb_user:I7ChpSAGUJOQC0oEY0ZjskhiHlxy0W7L@dpg-d5b881ngi27c738no9v0-a.oregon-postgres.render.com/focuradb?sslmode=require"
    npx prisma db pull
    npx prisma migrate deploy
-   $env:DATABASE_URL="postgresql://focuradb_user:I7ChpSAGUJOQC0oEY0ZjskhiHlxy0W7L@dpg-d5b881ngi27c738no9v0-a.oregon-postgres.render.com/focuradb"
+
 ```
 
 7. Start the backend server:

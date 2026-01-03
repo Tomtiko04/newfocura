@@ -93,6 +93,11 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       suggestedQuarter: z.number().min(1).max(4).optional(),
       skillLevel: z.enum(['beginner', 'intermediate', 'expert']).optional(),
       priorityOrder: z.number().int().optional(),
+      aiBaselinePrompt: z.string().optional(),
+      baselineMetric: z.string().optional(),
+      baselineValue: z.string().optional(),
+      failureRisk: z.string().optional(),
+      recoveryStrategy: z.string().optional(),
     }).parse(req.body);
 
     const updated = await prisma.yearlyGoal.updateMany({
@@ -116,6 +121,11 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         ...('suggestedQuarter' in payload ? { suggestedQuarter: payload.suggestedQuarter } : {}),
         ...('skillLevel' in payload ? { skillLevel: payload.skillLevel } : {}),
         ...('priorityOrder' in payload ? { priorityOrder: payload.priorityOrder } : {}),
+        ...('aiBaselinePrompt' in payload ? { aiBaselinePrompt: payload.aiBaselinePrompt } : {}),
+        ...('baselineMetric' in payload ? { baselineMetric: payload.baselineMetric } : {}),
+        ...('baselineValue' in payload ? { baselineValue: payload.baselineValue } : {}),
+        ...('failureRisk' in payload ? { failureRisk: payload.failureRisk } : {}),
+        ...('recoveryStrategy' in payload ? { recoveryStrategy: payload.recoveryStrategy } : {}),
       },
     });
 
@@ -220,6 +230,7 @@ router.post('/feasibility', authenticateToken, async (req: AuthRequest, res) => 
           impactScore: analysis?.impactScore,
           priorityBucket: analysis?.priorityBucket,
           suggestedQuarter: analysis?.suggestedQuarter,
+          aiBaselinePrompt: analysis?.aiBaselinePrompt,
         };
       });
 

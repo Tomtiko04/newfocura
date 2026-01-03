@@ -22,6 +22,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
   String _skillLevel = 'beginner';
   bool _isImporting = false;
   late TabController _tabController;
+  int _planningStep = 0; // 0: Normal, 1: Baseline, 2: Pre-Mortem, 3: Yearly Contract
 
   @override
   void initState() {
@@ -41,6 +42,19 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
   Widget build(BuildContext context) {
     final state = ref.watch(yearlyGoalsProvider);
     final notifier = ref.read(yearlyGoalsProvider.notifier);
+
+    if (_planningStep > 0) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('2026 Strategy Design'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => _planningStep = 0),
+          ),
+        ),
+        body: _buildPlanningWorkflow(state, notifier),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -299,13 +313,204 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
       }
     }
 
-    await notifier.finalizeAllWithAnalysis(state.analysisResults);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Yearly goals finalized')),
-      );
-      _showFutureLetterDialog();
-    }
+    // Start multi-step workflow instead of immediate finalize
+    setState(() => _planningStep = 1);
+  }
+
+  Widget _buildPlanningWorkflow(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
+    if (_planningStep == 1) return _buildBaselineStep(state, notifier);
+    if (_planningStep == 2) return _buildPreMortemStep(state, notifier);
+    if (_planningStep == 3) return _buildYearlyContractView(state, notifier);
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildBaselineStep(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
+    final bucketA = state.goals.where((g) {
+      final analysis = state.analysisResults.firstWhere((a) => a.title == g.title, orElse: () => GoalAnalysis(title: g.title));
+      return (g.priorityBucket ?? analysis.priorityBucket) == 'A';
+    }).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Step 1: Day 1 Baseline', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('A goal without a starting point is just a wish. Tell Focura where you are starting today for your "Big 3" goals.', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 32),
+          ...bucketA.map((goal) {
+            final analysis = state.analysisResults.firstWhere((a) => a.title == goal.title, orElse: () => GoalAnalysis(title: goal.title));
+            final prompt = goal.aiBaselinePrompt ?? analysis.aiBaselinePrompt ?? 'What is your current starting point for this goal?';
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(goal.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo)),
+                    const SizedBox(height: 12),
+                    Text(prompt, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      onChanged: (val) => goal.copyWith(baselineValue: val), // Local state would be better but for now we'll collect at end
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Current weight: 85kg or Skill level: 2/10',
+                        border: OutlineInputBorder(),
+                      ),
+                      controller: TextEditingController(text: goal.baselineValue),
+                      onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, baselineValue: val),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => setState(() => _planningStep = 2),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: const Text('Next: Planning for Obstacles'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreMortemStep(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
+    final bucketA = state.goals.where((g) {
+      final analysis = state.analysisResults.firstWhere((a) => a.title == g.title, orElse: () => GoalAnalysis(title: g.title));
+      return (g.priorityBucket ?? analysis.priorityBucket) == 'A';
+    }).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Step 2: Pre-Mortem', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Imagine it is December 2026 and you failed. Why did it happen? Planning for obstacles now makes you 3x more likely to succeed.', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 32),
+          ...bucketA.map((goal) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(goal.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.redAccent)),
+                    const SizedBox(height: 12),
+                    const Text('What is the #1 risk that could stop you?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Burnout from work, losing interest, injury...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, failureRisk: val),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('If that happens, what is your "If-Then" recovery plan?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. If I get burnt out, I will take a 3-day total digital detox.',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (val) => notifier.updateGoalPlanning(goal.id, recoveryStrategy: val),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                _showFutureLetterDialog();
+                setState(() => _planningStep = 3);
+              },
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.green, foregroundColor: Colors.white),
+              child: const Text('Next: Emotional Commitment'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildYearlyContractView(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
+    final bucketA = state.goals.where((g) => g.priorityBucket == 'A').toList();
+    final bucketB = state.goals.where((g) => g.priorityBucket == 'B').toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.verified_user, size: 64, color: Colors.indigo),
+          const SizedBox(height: 16),
+          const Text('2026 Yearly Contract', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          const Text('Strategy is Locked', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 32),
+          _buildContractSection('The North Star', state.portfolioSummary ?? 'Focusing on skill acquisition and sustainable growth this year.'),
+          const SizedBox(height: 24),
+          _buildContractSection('The Big 3 (Bucket A)', ''),
+          ...bucketA.map((g) => ListTile(
+            title: Text(g.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Starting from: ${g.baselineValue ?? "Not set"}'),
+            leading: const Icon(Icons.star, color: Colors.amber),
+          )),
+          const SizedBox(height: 24),
+          _buildContractSection('The Guardrails', ''),
+          ...bucketA.where((g) => g.recoveryStrategy != null).map((g) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Text('IF ${g.failureRisk} ➔ THEN ${g.recoveryStrategy}', style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13)),
+          )),
+          const SizedBox(height: 48),
+          const Divider(),
+          const SizedBox(height: 24),
+          const Text('Ready to take the first step?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // TODO: Implement January Sprint logic
+                context.go('/home');
+              },
+              icon: const Icon(Icons.rocket_launch),
+              label: const Text('Build January Sprint'),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _planningStep = 0),
+            child: const Text('Exit to Dashboard'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContractSection(String title, String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+        const SizedBox(height: 8),
+        if (content.isNotEmpty) Text(content, style: const TextStyle(fontSize: 16)),
+      ],
+    );
   }
 
   Widget _buildRealityAlert(double total, double capacity) {

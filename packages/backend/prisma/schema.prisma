@@ -25,6 +25,7 @@ model User {
   weekendFocusHours   Float           @default(4.0)
   dailyBioSyncs       DailyBioSync[]
   energyPatterns      EnergyPattern[]
+  futureLetters       FutureLetter[]
   goals               Goal[]
   momentumScores      MomentumScore[]
   reflections         Reflection[]
@@ -32,7 +33,6 @@ model User {
   snaps               Snap[]
   tasks               Task[]
   yearlyGoals         YearlyGoal[]
-  futureLetters       FutureLetter[]
 }
 
 model Goal {
@@ -71,6 +71,11 @@ model YearlyGoal {
   priorityBucket     String?
   suggestedQuarter   Int?
   skillLevel         String?   @default("beginner")
+  aiBaselinePrompt   String?
+  baselineMetric     String?
+  baselineValue      String?
+  failureRisk        String?
+  recoveryStrategy   String?
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

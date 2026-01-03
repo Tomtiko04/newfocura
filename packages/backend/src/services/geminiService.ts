@@ -218,7 +218,8 @@ Task:
    - Bucket B (Supporters): Up to 5 goals. 30% of capacity.
    - Bucket C (Backlog): Lower priority or queued.
 4. QUARTERLY SEQUENCING: Suggest which Quarter (1-4) to start each goal to prevent burnout and respect prerequisites.
-5. REALITY CHECK: If total hours exceed capacity (adjusted for reliabilityScore), lower feasibility scores and suggest pivots.
+5. BASELINE SETTING: For Bucket A goals, suggest a "Day 1" benchmark question (e.g. "What is your current bench press?" or "1-10 comfort with TS?").
+6. REALITY CHECK: If total hours exceed capacity (adjusted for reliabilityScore), lower feasibility scores and suggest pivots.
 
 Output Requirements:
 Return ONLY a valid JSON object with this structure:
@@ -232,6 +233,7 @@ Return ONLY a valid JSON object with this structure:
       "impactScore": number (1-10),
       "priorityBucket": "A | B | C",
       "suggestedQuarter": 1 | 2 | 3 | 4,
+      "aiBaselinePrompt": "A specific question to ask the user about their starting point",
       "analysis": {
          "summary": "How this fits into the user's reality",
          "challenges": ["string"],
