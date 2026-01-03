@@ -20,19 +20,40 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
-    final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+    final seenAppOnboarding = prefs.getBool('seen_onboarding') ?? false;
 
     // Allow auth state to hydrate
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
     final auth = ref.read(authStateProvider);
-    if (!seenOnboarding) {
+    
+    if (!seenAppOnboarding) {
+      // First time EVER opening the app on this device
       context.go('/onboarding');
-    } else if (auth.isAuthenticated) {
-      context.go('/home');
-    } else {
+      return;
+    }
+
+    if (!auth.isAuthenticated) {
       context.go('/login');
+      return;
+    }
+
+    // User is authenticated, now check if they've done the "Reality Check" survey
+    try {
+      final userReality = await ref.read(userProvider.notifier).loadReality();
+      final reality = ref.read(userProvider).value;
+
+      if (reality == null || !reality.onboardingCompleted) {
+        // Logged in but hasn't done the survey
+        context.go('/reality-check');
+      } else {
+        // Fully onboarded
+        context.go('/home');
+      }
+    } catch (e) {
+      // Fallback to home if check fails
+      context.go('/home');
     }
   }
 

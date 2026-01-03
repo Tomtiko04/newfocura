@@ -363,6 +363,12 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
               onPressed: state.goals.isEmpty
                   ? null
                   : () async {
+                      final userReality = ref.read(userProvider).value;
+                      if (userReality == null || !userReality.onboardingCompleted) {
+                        _showOnboardingRequiredDialog();
+                        return;
+                      }
+                      
                       try {
                         final results = await notifier.analyzeAll();
                         if (mounted) {
@@ -1015,6 +1021,37 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     if (score >= 60) return Colors.orange;
     if (score >= 40) return Colors.amber;
     return Colors.red;
+  }
+
+  void _showOnboardingRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.psychology, color: Colors.indigo),
+            SizedBox(width: 8),
+            Text('Reality Check Required'),
+          ],
+        ),
+        content: const Text(
+          'To tell you if these goals are realistic, Focura needs to know your weekly capacity and energy baseline first.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.push('/reality-check');
+            },
+            child: const Text('Tell Focura About My Week'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showFutureLetterDialog() {

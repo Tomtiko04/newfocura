@@ -33,30 +33,59 @@ class HomeScreen extends ConsumerWidget {
               if (reality == null || !reality.onboardingCompleted) {
                 return Container(
                   width: double.infinity,
-                  color: Colors.indigo.withOpacity(0.1),
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.psychology, color: Colors.indigo),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Reality Check Required',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
-                            ),
-                            const Text(
-                              'Focura needs to understand your context to optimize your goals.',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.indigo[700]!, Colors.indigo[500]!],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.indigo.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      TextButton(
-                        onPressed: () => context.push('/reality-check'),
-                        child: const Text('Start'),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            'One Final Step',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'To give you accurate feasibility scores and avoid burnout, Focura needs to know your weekly "Reality Context."',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => context.push('/reality-check'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.indigo,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Complete Reality Check',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
                       ),
                     ],
                   ),
