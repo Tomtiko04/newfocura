@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { logger } from '../utils/logger';
 import { z } from 'zod';
 
@@ -15,10 +15,14 @@ const letterSchema = z.object({
 /**
  * Create a letter to future self
  */
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { content, openAt } = letterSchema.parse(req.body);
-    const userId = (req as any).user.id;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' });
+    }
 
     // Default open date: end of current year
     const defaultOpenAt = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
@@ -44,9 +48,14 @@ router.post('/', authenticateToken, async (req, res) => {
 /**
  * Get user's letters (only those ready to open)
  */
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' });
+    }
+
     const now = new Date();
 
     const letters = await prisma.futureLetter.findMany({

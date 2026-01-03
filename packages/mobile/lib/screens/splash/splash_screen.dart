@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/user_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -41,7 +42,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // User is authenticated, now check if they've done the "Reality Check" survey
     try {
-      final userReality = await ref.read(userProvider.notifier).loadReality();
+      await ref.read(userProvider.notifier).loadReality();
+      if (!mounted) return;
+      
       final reality = ref.read(userProvider).value;
 
       if (reality == null || !reality.onboardingCompleted) {
@@ -52,6 +55,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         context.go('/home');
       }
     } catch (e) {
+      if (!mounted) return;
       // Fallback to home if check fails
       context.go('/home');
     }

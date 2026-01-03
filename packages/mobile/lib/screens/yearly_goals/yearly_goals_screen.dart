@@ -71,22 +71,39 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     final userReality = ref.watch(userProvider).value;
     final hasAnalysis = state.analysisResults.isNotEmpty;
     
-    // Reality Alert Logic
-    double totalHours = 0;
+    // Reality Budget Logic (Hybrid Math)
+    double hoursA = 0;
+    double hoursB = 0;
+    double hoursC = 0;
+
     for (final goal in state.goals) {
       final analysis = state.analysisResults.firstWhere(
         (a) => a.title == goal.title,
         orElse: () => GoalAnalysis(title: goal.title),
       );
-      totalHours += (goal.estimatedHours ?? analysis.estimatedHours ?? 0);
+      
+      final currentBucket = (state.analysisResults.any((a) => a.title == goal.title))
+          ? analysis.priorityBucket
+          : goal.priorityBucket;
+      
+      final hours = goal.estimatedHours ?? analysis.estimatedHours ?? 0;
+      
+      if (currentBucket == 'A') hoursA += hours;
+      else if (currentBucket == 'B') hoursB += hours;
+      else hoursC += hours;
     }
 
-    // Rough capacity for the year (52 weeks)
     final weeklyCapacity = userReality != null 
       ? (userReality.weekdayFocusHours * 5) + userReality.weekendFocusHours
       : 40.0;
-    final yearlyCapacity = weeklyCapacity * 50; // assuming 2 weeks vacation
-    final isOverCapacity = totalHours > yearlyCapacity;
+    final yearlyCapacity = weeklyCapacity * 50;
+    
+    final capA = yearlyCapacity * 0.6;
+    final capB = yearlyCapacity * 0.3;
+    
+    final isOverA = hoursA > capA;
+    final isOverB = hoursB > capB;
+    final isOverTotal = (hoursA + hoursB) > (capA + capB);
 
     return RefreshIndicator(
       onRefresh: notifier.loadGoals,
@@ -96,13 +113,13 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isOverCapacity && userReality != null)
-              _buildRealityAlert(totalHours, yearlyCapacity),
+            if (hasAnalysis && userReality != null)
+              _buildLiveBudgetView(hoursA, capA, hoursB, capB, hoursC, isOverTotal),
             if (hasAnalysis)
-              _buildNextStepsCard(notifier, state),
+              _buildNextStepsCard(notifier, state, isOverTotal),
             _buildAddGoalCard(notifier),
             const SizedBox(height: 16),
-            _buildActionHeader(state, notifier),
+            _buildActionHeader(state, notifier, isOverTotal),
             const SizedBox(height: 8),
             _buildGoalsList(state, notifier),
           ],
@@ -111,7 +128,89 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     );
   }
 
-  Widget _buildNextStepsCard(YearlyGoalsNotifier notifier, YearlyGoalsState state) {
+  Widget _buildLiveBudgetView(double hA, double capA, double hB, double capB, double hC, bool isOver) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isOver ? Colors.red[50] : Colors.green[50],
+        border: Border.all(color: isOver ? Colors.red[200]! : Colors.green[200]!),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isOver ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                color: isOver ? Colors.red[700] : Colors.green[700],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isOver ? 'Reality Alert: Resource Overload' : 'Capacity Check: Healthy',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  color: isOver ? Colors.red[900] : Colors.green[900],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildBudgetBar('🏆 Bucket A (Focus)', hA, capA, Colors.red[400]!),
+          const SizedBox(height: 8),
+          _buildBudgetBar('🥈 Bucket B (Support)', hB, capB, Colors.orange[400]!),
+          const SizedBox(height: 8),
+          _buildBudgetBar('🥉 Bucket C (Backlog)', hC, null, Colors.blue[400]!),
+          if (isOver)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'Recommendation: Move low-impact goals to Bucket C or a later Quarter to turn this green.',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.red[700]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBudgetBar(String label, double used, double? cap, Color color) {
+    final double percent = cap != null ? (used / cap).clamp(0.0, 1.0) : 0.0;
+    final bool isFull = cap != null && used > cap;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              cap != null ? '${used.toStringAsFixed(0)} / ${cap.toStringAsFixed(0)} hrs' : '${used.toStringAsFixed(0)} hrs',
+              style: TextStyle(fontSize: 11, color: isFull ? Colors.red : Colors.grey[700]),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (cap != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percent,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(isFull ? Colors.red : color),
+              minHeight: 6,
+            ),
+          )
+        else
+          const Text('Unlimited (Safe Zone)', style: TextStyle(fontSize: 10, color: Colors.blue)),
+      ],
+    );
+  }
+
+  Widget _buildNextStepsCard(YearlyGoalsNotifier notifier, YearlyGoalsState state, bool isOver) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -152,15 +251,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                await notifier.finalizeAllWithAnalysis(state.analysisResults);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Yearly goals finalized')),
-                  );
-                  _showFutureLetterDialog();
-                }
-              },
+              onPressed: () => _handleFinalize(notifier, state, isOver),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
@@ -174,49 +265,51 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     );
   }
 
-  Widget _buildRealityAlert(double total, double capacity) {
-    final overage = total - capacity;
-    final percent = (total / capacity * 100).toStringAsFixed(0);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        border: Border.all(color: Colors.red[200]!),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  Future<void> _handleFinalize(YearlyGoalsNotifier notifier, YearlyGoalsState state, bool isOver) async {
+    if (isOver) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red[700]),
-              const SizedBox(width: 8),
-              Text(
-                'Reality Alert: Resource Overload',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[900]),
-              ),
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Reality Check: Overload'),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Your goals require approx. ${total.toStringAsFixed(0)} hours this year, but your "Reality Check" profile says you only have ${capacity.toStringAsFixed(0)} hours available.',
-            style: TextStyle(fontSize: 13, color: Colors.red[900]),
+          content: const Text(
+            'You\'ve committed to a high-intensity year. Your current goals are significantly over-capacity. \n\nFocura will save this plan, but we recommend checking in weekly to avoid burnout. \n\nDo you want to proceed or fix your buckets?',
           ),
-          const SizedBox(height: 4),
-          Text(
-            'You are at $percent% capacity. Burnout risk is EXTREMELY HIGH.',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red[900]),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Recommendation: Move low-impact goals to Bucket C or postpone to next year.',
-            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.red[700]),
-          ),
-        ],
-      ),
-    );
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+              child: const Text('Fix My Buckets'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Proceed Anyway', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) {
+        _tabController.animateTo(1); // Switch to Roadmap to fix
+        return;
+      }
+    }
+
+    await notifier.finalizeAllWithAnalysis(state.analysisResults);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Yearly goals finalized')),
+      );
+      _showFutureLetterDialog();
+    }
+  }
+
+  Widget _buildRealityAlert(double total, double capacity) {
+    return const SizedBox.shrink();
   }
 
   Widget _buildAddGoalCard(YearlyGoalsNotifier notifier) {
@@ -352,7 +445,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
     );
   }
 
-  Widget _buildActionHeader(YearlyGoalsState state, YearlyGoalsNotifier notifier) {
+  Widget _buildActionHeader(YearlyGoalsState state, YearlyGoalsNotifier notifier, bool isOver) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -398,15 +491,7 @@ class _YearlyGoalsScreenState extends ConsumerState<YearlyGoalsScreen> with Sing
             ElevatedButton.icon(
               onPressed: state.analysisResults.isEmpty
                   ? null
-                  : () async {
-                      await notifier.finalizeAllWithAnalysis(state.analysisResults);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Yearly goals finalized')),
-                        );
-                        _showFutureLetterDialog();
-                      }
-                    },
+                  : () => _handleFinalize(notifier, state, isOver),
               icon: const Icon(Icons.check_circle),
               label: const Text('Finalize'),
             ),

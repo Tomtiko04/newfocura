@@ -79,7 +79,9 @@ class HomeScreen extends ConsumerWidget {
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.indigo,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: BorderRadius.circular(8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                           child: const Text(
                             'Complete Reality Check',
